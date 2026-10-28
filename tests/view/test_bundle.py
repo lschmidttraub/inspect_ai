@@ -2,9 +2,12 @@ import base64
 import hashlib
 import json
 import os
+import sys
 import tempfile
 from html.parser import HTMLParser
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from test_helpers.utils import skip_if_trio
@@ -12,12 +15,17 @@ from test_helpers.utils import skip_if_trio
 from inspect_ai import Task, eval
 from inspect_ai._util.error import PrerequisiteError
 from inspect_ai._util.file import filesystem
-from inspect_ai._view._csp import CSP_FILENAME, read_content_security_policy
+from inspect_ai._view._csp import (
+    CSP_FILENAME,
+    ContentSecurityPolicyError,
+    read_content_security_policy,
+)
 from inspect_ai._view._dist import resolve_dist_directory
 from inspect_ai.dataset import Sample
 from inspect_ai.log._bundle import (
     _insert_content_security_policy,
     _prepare_viewer,
+    _push_bundle_to_hf,
     bundle_log_dir,
     embed_log_dir,
 )
@@ -300,6 +308,155 @@ def test_bundle_without_viewer_csp_is_unchanged(
         "</head>",
         f'  <script id="log_dir_context" type="application/json">{context}</script>\n  </head>',
     )
+
+
+def _bundle_to(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    output_dir: str,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Run `bundle_log_dir` over the fixture dist, capturing the HF push."""
+    dist_dir = _fixture_dist(
+        tmp_path, {"default-src": ["'none'"], "connect-src": ["'self'"]}
+    )
+    monkeypatch.setattr("inspect_ai.log._bundle._dist_dir", lambda: dist_dir.as_posix())
+    monkeypatch.setattr(
+        "inspect_ai.log._bundle._check_hf_space_exists", lambda repo_id: False
+    )
+    captured: dict[str, Any] = {}
+
+    def copy_log_files(*args: Any) -> None:
+        captured["fs_options"] = args[3]
+
+    def push(working_dir: str, output_dir: str, private: bool | None) -> None:
+        captured["index_html"] = (Path(working_dir) / "index.html").read_text()
+        captured["private"] = private
+
+    monkeypatch.setattr("inspect_ai.log._bundle.copy_log_files", copy_log_files)
+    monkeypatch.setattr(
+        "inspect_ai.log._bundle.write_log_listing", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr("inspect_ai.log._bundle._push_bundle_to_hf", push)
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    bundle_log_dir(log_dir=str(log_dir), output_dir=output_dir, **kwargs)
+    return captured
+
+
+def test_hf_bundle_allows_hf_cdn_redirects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured = _bundle_to(tmp_path, monkeypatch, "hf/username/myspace")
+    assert (
+        "connect-src 'self' https://huggingface.co https://*.hf.co"
+        in captured["index_html"]
+    )
+    assert captured["private"] is None
+
+
+def test_local_bundle_keeps_connect_src_self(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output_dir = tmp_path / "out"
+    _bundle_to(tmp_path, monkeypatch, str(output_dir))
+    index_html = (output_dir / "index.html").read_text()
+    assert "connect-src 'self'\"" in index_html
+    assert "hf.co" not in index_html
+
+
+def test_hf_bundle_accepts_legacy_private_fs_option(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured = _bundle_to(
+        tmp_path,
+        monkeypatch,
+        "hf/username/myspace",
+        fs_options={"private": True, "anon": True},
+    )
+    assert captured["private"] is True
+    # `private` is a bundle option, not a filesystem argument
+    assert captured["fs_options"] == {"anon": True}
+
+
+class _FakeHfApi:
+    """Records `HfApi` calls; `existing` maps repo ids to their privacy."""
+
+    def __init__(self, existing: dict[str, bool]) -> None:
+        self.existing = existing
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    def __call__(self) -> "_FakeHfApi":
+        return self
+
+    def repo_info(self, repo_id: str, repo_type: str) -> SimpleNamespace:
+        if repo_id not in self.existing:
+            raise LookupError(repo_id)
+        return SimpleNamespace(private=self.existing[repo_id])
+
+    def create_repo(self, **kwargs: Any) -> None:
+        self.calls.append(("create_repo", kwargs))
+        self.existing[kwargs["repo_id"]] = kwargs["private"]
+
+    def update_repo_settings(self, **kwargs: Any) -> None:
+        self.calls.append(("update_repo_settings", kwargs))
+        self.existing[kwargs["repo_id"]] = kwargs["private"]
+
+    def upload_folder(self, **kwargs: Any) -> None:
+        self.calls.append(("upload_folder", kwargs))
+
+
+def _push_with_fake_hf(
+    monkeypatch: pytest.MonkeyPatch,
+    existing: dict[str, bool],
+    private: bool | None,
+) -> _FakeHfApi:
+    api = _FakeHfApi(existing)
+    monkeypatch.setitem(sys.modules, "huggingface_hub", SimpleNamespace(HfApi=api))
+    _push_bundle_to_hf("/bundle", "hf/user/space", private)
+    return api
+
+
+@pytest.mark.parametrize("private", [None, False, True])
+def test_push_bundle_to_hf_creates_public_space_by_default(
+    monkeypatch: pytest.MonkeyPatch, private: bool | None
+) -> None:
+    api = _push_with_fake_hf(monkeypatch, {}, private)
+    assert api.calls[0] == (
+        "create_repo",
+        {
+            "repo_id": "user/space",
+            "repo_type": "space",
+            "space_sdk": "static",
+            "private": bool(private),
+        },
+    )
+    assert api.calls[1][0] == "upload_folder"
+
+
+def test_push_bundle_to_hf_keeps_existing_visibility(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = _push_with_fake_hf(monkeypatch, {"user/space": True}, None)
+    assert [name for name, _ in api.calls] == ["upload_folder"]
+    assert api.existing["user/space"] is True
+
+
+def test_push_bundle_to_hf_updates_existing_visibility_when_asked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = _push_with_fake_hf(monkeypatch, {"user/space": True}, False)
+    assert api.calls[0] == (
+        "update_repo_settings",
+        {"repo_id": "user/space", "repo_type": "space", "private": False},
+    )
+    assert api.existing["user/space"] is False
+
+
+def test_csp_extra_connect_src_requires_connect_src(tmp_path: Path) -> None:
+    dist_dir = _fixture_dist(tmp_path, {"default-src": ["'none'"]})
+    with pytest.raises(ContentSecurityPolicyError, match="no 'connect-src'"):
+        read_content_security_policy(dist_dir, ["https://*.hf.co"])
 
 
 def test_bundle_viewer_csp_requires_head(

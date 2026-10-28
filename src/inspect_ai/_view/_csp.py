@@ -9,6 +9,7 @@ dist it was read from.
 """
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -24,11 +25,16 @@ class ContentSecurityPolicyError(ValueError):
     """A viewer dist contains a malformed Content-Security-Policy file."""
 
 
-def read_content_security_policy(dist_dir: Path) -> str | None:
+def read_content_security_policy(
+    dist_dir: Path, extra_connect_src: Sequence[str] = ()
+) -> str | None:
     """Read the viewer Content-Security-Policy from a dist directory.
 
     Args:
         dist_dir: Local directory containing the built viewer (`index.html`).
+        extra_connect_src: Sources appended to the policy's `connect-src`, for
+            hosts that serve the bundled logs from another origin (e.g. a
+            Hugging Face Space redirecting log reads to its CDN).
 
     Returns:
         The policy string (directives in file order, each name followed by its
@@ -55,14 +61,14 @@ def read_content_security_policy(dist_dir: Path) -> str | None:
         ) from ex
 
     try:
-        return _policy_string(data)
+        return _policy_string(data, extra_connect_src)
     except ValueError as ex:
         raise ContentSecurityPolicyError(
             f"Invalid viewer Content-Security-Policy file {policy_file}: {ex}"
         ) from ex
 
 
-def _policy_string(data: Any) -> str:
+def _policy_string(data: Any, extra_connect_src: Sequence[str] = ()) -> str:
     if not isinstance(data, dict):
         raise ValueError("expected a JSON object")
 
@@ -88,10 +94,15 @@ def _policy_string(data: Any) -> str:
         # An empty list is a value-less directive (`upgrade-insecure-requests`).
         if not isinstance(sources, list):
             raise ValueError(f"directive {name!r} must have a list of sources")
+        if folded == "connect-src":
+            sources = [*sources, *extra_connect_src]
         for source in sources:
             _validate_token(source, f"source in directive {name!r}")
 
         parts.append(" ".join([name, *sources]))
+
+    if extra_connect_src and "connect-src" not in seen:
+        raise ValueError("policy has no 'connect-src' directive to extend")
 
     return "; ".join(parts)
 

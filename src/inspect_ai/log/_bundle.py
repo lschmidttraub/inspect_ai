@@ -7,7 +7,7 @@ import shutil
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Iterator, Sequence
 
 from inspect_ai._util.error import PrerequisiteError, pip_dependency_error
 from inspect_ai._util.file import absolute_file_path, filesystem
@@ -26,11 +26,31 @@ def _dist_dir() -> str:
     return resolve_dist_directory().as_posix()
 
 
+# A Space serves its LFS/Xet files (every bundled log) by redirecting to the
+# Hugging Face CDN (e.g. us.aws.cdn.hf.co), so the viewer's `connect-src
+# 'self'` would block every log read.
+HF_CONNECT_SRC = ("https://huggingface.co", "https://*.hf.co")
+
+HF_PRIVATE_SPACE_WARNING = (
+    "The space is private: its log files are only served to signed-in members, "
+    "so log reads from the viewer can fail with 401. Spaces are public unless "
+    "you pass --private."
+)
+
+
 def _push_bundle_to_hf(
     working_dir: str,
-    repo_id: str,
-    fs_options: dict[str, Any] = {},
+    output_dir: str,
+    private: bool | None = None,
 ) -> None:
+    """Upload a bundle to a static Hugging Face space, creating it if needed.
+
+    Args:
+        working_dir: The assembled bundle.
+        output_dir: The 'hf/<user>/<space>' target.
+        private: Visibility of the space. None creates a new space as public
+            and leaves an existing space's visibility unchanged.
+    """
     from inspect_ai._display import display
 
     try:
@@ -41,15 +61,23 @@ def _push_bundle_to_hf(
         ) from None
 
     api = HfApi()
-    repo_id = hf_repo_id(repo_id)
+    repo_id = hf_repo_id(output_dir)
 
-    api.create_repo(
-        repo_id=repo_id,
-        repo_type="space",
-        space_sdk="static",
-        private=fs_options.get("private", True),  # default to Private
-        exist_ok=True,
-    )
+    if _check_hf_space_exists(repo_id):
+        if private is not None:
+            api.update_repo_settings(
+                repo_id=repo_id, repo_type="space", private=private
+            )
+    else:
+        api.create_repo(
+            repo_id=repo_id,
+            repo_type="space",
+            space_sdk="static",
+            private=bool(private),
+        )
+
+    if api.repo_info(repo_id=repo_id, repo_type="space").private:
+        display().print(HF_PRIVATE_SPACE_WARNING)
 
     api.upload_folder(
         folder_path=working_dir,
@@ -85,6 +113,7 @@ def bundle_log_dir(
     output_dir: str | None = None,
     overwrite: bool = False,
     fs_options: dict[str, Any] = {},
+    private: bool | None = None,
 ) -> None:
     r"""Bundle a log_dir into a statically deployable viewer
 
@@ -97,7 +126,16 @@ def bundle_log_dir(
             Defaults to False.
         fs_options (dict[str, Any]): Optional. Additional arguments to pass through
             to the filesystem provider (e.g. `S3FileSystem`).
+        private (bool | None): Optional. For an 'hf/' output, whether the space is
+            private. New spaces are public by default, since the viewer can't
+            authenticate the redirected log reads of a private space; an existing
+            space keeps its visibility unless this is set. A `private` key in
+            `fs_options` is accepted as an older spelling.
     """
+    if "private" in fs_options:
+        if private is None:
+            private = bool(fs_options["private"])
+        fs_options = {k: v for k, v in fs_options.items() if k != "private"}
     # resolve the log directory
     if not log_dir:
         log_dir = os.getenv("INSPECT_LOG_DIR", "./logs")
@@ -146,6 +184,7 @@ def bundle_log_dir(
                 working_dir,
                 log_dir=log_dir_name,
                 abs_log_dir=absolute_file_path(log_dir),
+                extra_connect_src=HF_CONNECT_SRC if is_hf_target(output_dir) else (),
             )
             p.update(25)
 
@@ -161,7 +200,7 @@ def bundle_log_dir(
             p.update(25)
 
             if is_hf_target(output_dir):
-                _push_bundle_to_hf(working_dir, output_dir, fs_options)
+                _push_bundle_to_hf(working_dir, output_dir, private)
             else:
                 move_output(working_dir, output_dir, p.update, fs_options)
             p.complete()
@@ -258,7 +297,10 @@ Disallow: /
 
 
 def _prepare_viewer(
-    working_dir: str, log_dir: str, abs_log_dir: str | None = None
+    working_dir: str,
+    log_dir: str,
+    abs_log_dir: str | None = None,
+    extra_connect_src: Sequence[str] = (),
 ) -> None:
     """Prepare viewer assets in a working directory."""
     copy_dir_contents(_dist_dir(), working_dir)
@@ -266,7 +308,9 @@ def _prepare_viewer(
         os.path.join(working_dir, "index.html"),
         log_dir=log_dir,
         abs_log_dir=abs_log_dir,
-        content_security_policy=read_content_security_policy(Path(working_dir)),
+        content_security_policy=read_content_security_policy(
+            Path(working_dir), extra_connect_src
+        ),
     )
     write_robots_txt(working_dir)
 

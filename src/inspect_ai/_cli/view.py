@@ -181,9 +181,18 @@ def start(
     default=False,
     help="Overwrite files in the output directory.",
 )
+@click.option(
+    "--private/--public",
+    default=None,
+    help="Visibility of the Hugging Face space for an 'hf/<user>/<space>' output. "
+    "New spaces are public by default: a private space only serves its log files "
+    "to signed-in members, so the viewer's log reads can fail with 401. An existing "
+    "space keeps its visibility unless one of these is passed.",
+)
 def bundle_command(
     output_dir: str,
     overwrite: bool,
+    private: bool | None,
     **common: Unpack[CommonOptions],
 ) -> None:
     """Bundle evaluation logs"""
@@ -191,7 +200,10 @@ def bundle_command(
     process_common_options(common)
 
     bundle_log_dir(
-        output_dir=output_dir, log_dir=common["log_dir"], overwrite=overwrite
+        output_dir=output_dir,
+        log_dir=common["log_dir"],
+        overwrite=overwrite,
+        private=private,
     )
 
 

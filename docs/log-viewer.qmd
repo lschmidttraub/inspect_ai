@@ -315,7 +315,9 @@ You can publish your bundled log viewer directly to [HuggingFace Spaces](https:/
 $ inspect view bundle --log-dir logs --output-dir hf/my-org/my-eval-logs
 ```
 
-The space will be created as a static space and your logs will be immediately available at `https://huggingface.co/spaces/my-org/my-eval-logs`. By default, the space will be created as private. To create a public space, you can use the Python API:
+The space will be created as a public static space and your logs will be immediately available at `https://huggingface.co/spaces/my-org/my-eval-logs`. Hugging Face serves the bundled logs by redirecting to its CDN, so the bundle's Content-Security-Policy allows `https://huggingface.co` and `https://*.hf.co` for log reads.
+
+Pass `--private` to create a private space instead (or `--public` to make an existing space public). A private space only serves its files to signed-in members, so the viewer's log reads can fail with 401. Without either option, an existing space keeps its visibility. From Python, pass `private`:
 
 ``` python
 from inspect_ai.log import bundle_log_dir
@@ -323,7 +325,7 @@ from inspect_ai.log import bundle_log_dir
 bundle_log_dir(
     log_dir="logs",
     output_dir="hf/my-org/my-eval-logs",
-    fs_options={"private": False}
+    private=True,
 )
 ```
 
