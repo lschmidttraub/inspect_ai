@@ -49,10 +49,14 @@ from ._dist import resolve_dist_directory
 from .common import (
     AppConfig,
     LogDirResponse,
+    LogExistsError,
     LogFilesResponse,
     LogInfo,
     LogInProgressError,
     LogListingResponse,
+    LogSubsetRequest,
+    LogSubsetSaveRequest,
+    LogSubsetSaveResponse,
     apply_log_edits,
     build_pending_sample_urls,
     delete_log,
@@ -63,10 +67,13 @@ from .common import (
     get_log_info,
     get_log_size,
     get_logs,
+    log_subset_bytes,
+    log_subset_location,
     normalize_uri,
     parse_log_token,
     read_eval_set_info_async,
     stream_log_bytes,
+    write_log_subset,
 )
 from .network import (
     BrowserOriginMiddleware,
@@ -284,6 +291,56 @@ def view_server_app(
         headers = {"ETag": new_etag} if new_etag is not None else {}
         return Response(
             content=contents, media_type="application/json", headers=headers
+        )
+
+    # POST (not GET like /log-download) because the sample list can outgrow a
+    # URL; the mutating-request check also keeps other origins from triggering
+    # the server-side work.
+    @app.post("/log-subset-download/{log:path}")
+    async def api_log_subset_download(
+        request: Request, log: str, subset: LogSubsetRequest
+    ) -> Response:
+        _validate_mutating_request(request)
+        file = normalize_uri(log)
+        await _validate_read(request, file)
+        try:
+            contents = await log_subset_bytes(
+                await _map_file(request, file), subset.samples
+            )
+        except LogInProgressError as ex:
+            raise HTTPException(status_code=409, detail=str(ex))
+        except ValueError as ex:
+            raise HTTPException(status_code=400, detail=str(ex))
+        return Response(
+            content=contents,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": "attachment"},
+        )
+
+    @app.post("/log-subset-save/{log:path}")
+    async def api_log_subset_save(
+        request: Request, log: str, subset: LogSubsetSaveRequest
+    ) -> LogSubsetSaveResponse:
+        _validate_mutating_request(request)
+        file = normalize_uri(log)
+        await _validate_read(request, file)
+        try:
+            target = log_subset_location(file, subset.file_name)
+        except ValueError as ex:
+            raise HTTPException(status_code=400, detail=str(ex))
+        await _validate_write(request, target)
+        try:
+            result = await write_log_subset(
+                await _map_file(request, file),
+                await _map_file(request, target),
+                subset.samples,
+            )
+        except (LogExistsError, LogInProgressError) as ex:
+            raise HTTPException(status_code=409, detail=str(ex))
+        except ValueError as ex:
+            raise HTTPException(status_code=400, detail=str(ex))
+        return LogSubsetSaveResponse(
+            log_file=target, metrics_recomputed=result.metrics_recomputed
         )
 
     @app.get("/log-bytes/{log:path}")

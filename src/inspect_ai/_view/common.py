@@ -1,5 +1,6 @@
 import asyncio
 import os
+import tempfile
 import urllib.parse
 from collections.abc import AsyncIterable, Awaitable, Callable
 from functools import partial
@@ -17,13 +18,20 @@ from fsspec.core import split_protocol  # type: ignore
 from pydantic import BaseModel
 from s3fs import S3FileSystem  # type: ignore
 from s3fs.core import _error_wrapper, version_id_kw  # type: ignore
+from shortuuid import uuid
 
 from inspect_ai._eval.evalset import EvalSet
 from inspect_ai._util._async import tg_collect
 from inspect_ai._util.asyncfiles import _READ_FULLY_CHUNK_SIZE, AsyncFilesystem
 from inspect_ai._util.azure import is_azure_auth_error
 from inspect_ai._util.constants import PKG_NAME
-from inspect_ai._util.file import default_fs_options, dirname, filesystem, size_in_mb
+from inspect_ai._util.file import (
+    basename,
+    default_fs_options,
+    dirname,
+    filesystem,
+    size_in_mb,
+)
 from inspect_ai._view.azure import normalize_azure_listing_name
 from inspect_ai.log._edit import LogUpdate, edit_eval_log
 from inspect_ai.log._file import (
@@ -33,9 +41,11 @@ from inspect_ai.log._file import (
     list_eval_logs_async,
     log_file_info_async,
     read_eval_log_async,
+    read_eval_log_samples_by_id_async,
     write_eval_log_async,
 )
 from inspect_ai.log._log import EvalLog
+from inspect_ai.log._metric import recompute_metrics
 from inspect_ai.log._recorders.buffer.buffer import sample_buffer
 from inspect_ai.log._recorders.buffer.filestore import SampleBufferFilestore
 from inspect_ai.log._recorders.buffer.types import PendingSampleUrls, SegmentRef
@@ -383,6 +393,148 @@ async def apply_log_edits(
         log, location=file, if_match_etag=if_match_etag, header_only=True
     )
     return LogPayload(contents=eval_log_json(log), etag=write_result.etag)
+
+
+class LogSubsetSample(BaseModel):
+    """A sample in a log, addressed by id and epoch."""
+
+    id: str | int
+    epoch: int
+
+
+class LogSubsetRequest(BaseModel):
+    """Samples to copy from a log into a new log."""
+
+    samples: list[LogSubsetSample]
+
+
+class LogSubsetSaveRequest(LogSubsetRequest):
+    """Samples to copy into a new log saved in the source log's directory."""
+
+    file_name: str
+
+
+class LogSubsetSaveResponse(BaseModel):
+    log_file: str
+    """Path of the new log."""
+
+    metrics_recomputed: bool
+    """False when the source log's metrics could not be rebuilt in the view
+    server, in which case the new log has no aggregate results."""
+
+
+class LogSubset(NamedTuple):
+    log: EvalLog
+    metrics_recomputed: bool
+
+
+class LogExistsError(ValueError):
+    """Raised when a new log would overwrite an existing file (HTTP 409)."""
+
+
+async def build_log_subset(file: str, samples: list[LogSubsetSample]) -> LogSubset:
+    """Build a new log that holds only `samples` from the log at `file`.
+
+    The subset is a separate log: it gets fresh `eval_id` and `task_id` values
+    (the log list treats logs sharing a `task_id` in one folder as retries and
+    hides all but one) and records its source under
+    `eval.metadata["subset_of"]`. Metrics are recomputed from the kept samples.
+    When they can't be rebuilt in this process (e.g. a metric from a package
+    that isn't installed), `results` and `reductions` are removed rather than
+    left describing the full log.
+
+    Raises:
+        ValueError: No samples were given, or a sample is not in the log.
+        LogInProgressError: The log is still being written.
+    """
+    if not samples:
+        raise ValueError("No samples were selected.")
+
+    header = await read_eval_log_async(file, header_only=True)
+    if header.status == "started":
+        raise LogInProgressError(
+            "Cannot copy samples from a log while it is in progress. "
+            "Wait for the eval to finish (status != 'started'), then try again."
+        )
+
+    refs = list(dict.fromkeys((sample.id, sample.epoch) for sample in samples))
+    try:
+        async with AsyncFilesystem():
+            kept = await read_eval_log_samples_by_id_async(file, refs)
+    except IndexError as ex:
+        raise ValueError(str(ex)) from ex
+
+    log = header.model_copy(deep=True)
+    log.location = ""
+    log.etag = None
+    log.samples = kept
+    log.eval.eval_id = uuid()
+    log.eval.task_id = uuid()
+    log.eval.metadata = {
+        **(log.eval.metadata or {}),
+        "subset_of": {"log": file, "samples": len(kept)},
+    }
+
+    try:
+        recompute_metrics(log)
+        metrics_recomputed = True
+    except (LookupError, ValueError) as ex:
+        logger.warning(f"Unable to recompute metrics for subset of {file}: {ex}")
+        log.results = None
+        log.reductions = None
+        metrics_recomputed = False
+
+    return LogSubset(log=log, metrics_recomputed=metrics_recomputed)
+
+
+def log_subset_location(source: str, file_name: str) -> str:
+    """Resolve `file_name` to a path beside `source`, adding `.eval` if needed.
+
+    Raises:
+        ValueError: `file_name` is empty or names a path rather than a file.
+    """
+    name = file_name.strip()
+    if not name or "/" in name or "\\" in name or name.startswith("."):
+        raise ValueError(
+            "File name must be a plain file name (no directories or leading '.')."
+        )
+    if not name.endswith(".eval"):
+        name = f"{name}.eval"
+    return f"{dirname(source)}/{name}"
+
+
+async def write_log_subset(
+    source: str, location: str, samples: list[LogSubsetSample]
+) -> LogSubset:
+    """Write the samples `samples` of `source` to a new log at `location`.
+
+    Raises:
+        LogExistsError: A file already exists at `location`.
+        ValueError: See `build_log_subset`.
+        LogInProgressError: See `build_log_subset`.
+    """
+    if await _file_exists(location):
+        raise LogExistsError(f"A file named '{basename(location)}' already exists.")
+    subset = await build_log_subset(source, samples)
+    await write_eval_log_async(subset.log, location=location, format="eval")
+    return subset
+
+
+async def log_subset_bytes(source: str, samples: list[LogSubsetSample]) -> bytes:
+    """Serialize the samples `samples` of `source` as the bytes of a .eval log."""
+    subset = await build_log_subset(source, samples)
+    with tempfile.TemporaryDirectory() as tmp:
+        location = os.path.join(tmp, "subset.eval")
+        await write_eval_log_async(subset.log, location=location, format="eval")
+        return await anyio.Path(location).read_bytes()
+
+
+async def _file_exists(file: str) -> bool:
+    fs = filesystem(file)
+    if fs.is_async():
+        exists: bool = await async_connection(file)._exists(file)
+        return exists
+    return fs.exists(file)
 
 
 async def get_log_size(log_file: str) -> int:

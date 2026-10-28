@@ -22,6 +22,7 @@ from starlette.requests import Request
 from starlette.testclient import TestClient
 from test_helpers.utils import skip_if_trio
 
+import inspect_ai
 import inspect_ai._eval.evalset
 import inspect_ai._eval.task.resolved
 import inspect_ai._util.file
@@ -32,6 +33,7 @@ import inspect_ai.log._bundle
 import inspect_ai.log._file
 import inspect_ai.log._recorders.buffer.filestore
 import inspect_ai.model
+import inspect_ai.scorer
 from inspect_ai._util.asyncfiles import AsyncFilesystem
 from inspect_ai._util.event_loop_monitor import event_loop_monitor
 from inspect_ai._util.file import filesystem
@@ -683,6 +685,179 @@ def test_api_log_download(view_client: ViewTestClient) -> None:
     assert "content-disposition" in resp.headers
     assert ".eval" in resp.headers["content-disposition"]
     assert len(resp.content) == Path(full_path).stat().st_size
+
+
+def _write_scored_log(log_dir: Path) -> str:
+    """Run a 4-sample mockllm eval where samples 0 and 2 score correct."""
+    task = inspect_ai.Task(
+        dataset=[
+            inspect_ai.dataset.Sample(
+                id=f"s{i}", input="x", target="Default" if i % 2 == 0 else "zzz"
+            )
+            for i in range(4)
+        ],
+        scorer=inspect_ai.scorer.includes(),
+    )
+    [log] = inspect_ai.eval(
+        task, model="mockllm/model", log_dir=str(log_dir), display="none"
+    )
+    return log.location
+
+
+def _subset_body(*ids: str) -> dict[str, Any]:
+    return {"samples": [{"id": id, "epoch": 1} for id in ids]}
+
+
+def _accuracy(log: inspect_ai.log.EvalLog) -> float:
+    assert log.results is not None
+    return log.results.scores[0].metrics["accuracy"].value
+
+
+def test_api_log_subset_download(view_client: ViewTestClient) -> None:
+    source = _write_scored_log(view_client.log_dir)
+    resp = view_client.frontend_request(
+        "POST",
+        f"/log-subset-download/{source}",
+        json=_subset_body("s0", "s2", "s1"),
+    )
+    resp.raise_for_status()
+    assert resp.headers["content-type"] == "application/octet-stream"
+
+    subset_path = view_client.log_dir / "downloaded" / "subset.eval"
+    subset_path.parent.mkdir()
+    subset_path.write_bytes(resp.content)
+    subset = inspect_ai.log.read_eval_log(str(subset_path))
+    original = inspect_ai.log.read_eval_log(source, header_only=True)
+
+    assert [s.id for s in subset.samples or []] == ["s0", "s1", "s2"]
+    assert subset.results is not None
+    assert subset.results.total_samples == 3
+    assert _accuracy(subset) == pytest.approx(2 / 3)
+    assert _accuracy(original) == pytest.approx(0.5)
+    assert subset.eval.task_id != original.eval.task_id
+    assert subset.eval.eval_id != original.eval.eval_id
+    assert subset.eval.metadata is not None
+    assert subset.eval.metadata["subset_of"] == {"log": source, "samples": 3}
+    # the source log is left alone
+    assert len(inspect_ai.log.read_eval_log(source).samples or []) == 4
+
+
+def test_api_log_subset_download_requires_frontend_request(
+    view_client: ViewTestClient,
+) -> None:
+    source = _write_scored_log(view_client.log_dir)
+    resp = view_client.request(
+        "POST", f"/log-subset-download/{source}", json=_subset_body("s0")
+    )
+    assert resp.status_code == 403
+
+
+def test_api_log_subset_download_unknown_sample_returns_400(
+    view_client: ViewTestClient,
+) -> None:
+    source = _write_scored_log(view_client.log_dir)
+    resp = view_client.frontend_request(
+        "POST", f"/log-subset-download/{source}", json=_subset_body("nope")
+    )
+    assert resp.status_code == 400
+
+
+def test_api_log_subset_download_empty_selection_returns_400(
+    view_client: ViewTestClient,
+) -> None:
+    source = _write_scored_log(view_client.log_dir)
+    resp = view_client.frontend_request(
+        "POST", f"/log-subset-download/{source}", json={"samples": []}
+    )
+    assert resp.status_code == 400
+
+
+def test_api_log_subset_save(view_client: ViewTestClient) -> None:
+    source = _write_scored_log(view_client.log_dir)
+    resp = view_client.frontend_request(
+        "POST",
+        f"/log-subset-save/{source}",
+        json={**_subset_body("s1", "s3"), "file_name": "wrong_only"},
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    expected = f"{Path(source).parent.as_posix()}/wrong_only.eval"
+    assert body == {"log_file": expected, "metrics_recomputed": True}
+
+    subset = inspect_ai.log.read_eval_log(expected)
+    assert [s.id for s in subset.samples or []] == ["s1", "s3"]
+    assert _accuracy(subset) == 0
+
+    listed = view_client.request(
+        "GET",
+        f"/log-files?log_dir={urllib.parse.quote_plus(str(view_client.log_dir))}",
+    ).json()
+    assert any(f["name"].endswith("wrong_only.eval") for f in listed["files"])
+
+
+def test_api_log_subset_save_refuses_to_overwrite(
+    view_client: ViewTestClient,
+) -> None:
+    source = _write_scored_log(view_client.log_dir)
+    before = Path(source).read_bytes()
+    resp = view_client.frontend_request(
+        "POST",
+        f"/log-subset-save/{source}",
+        json={**_subset_body("s0"), "file_name": Path(source).name},
+    )
+    assert resp.status_code == 409
+    assert "already exists" in resp.text
+    assert Path(source).read_bytes() == before
+
+
+@pytest.mark.parametrize("file_name", ["", "../escape", "sub/dir.eval", ".hidden"])
+def test_api_log_subset_save_rejects_paths(
+    view_client: ViewTestClient, file_name: str
+) -> None:
+    source = _write_scored_log(view_client.log_dir)
+    resp = view_client.frontend_request(
+        "POST",
+        f"/log-subset-save/{source}",
+        json={**_subset_body("s0"), "file_name": file_name},
+    )
+    assert resp.status_code == 400
+    assert sorted(p.name for p in view_client.log_dir.rglob("*.eval")) == [
+        Path(source).name
+    ]
+
+
+def test_api_log_subset_in_progress_returns_409(
+    view_client: ViewTestClient,
+) -> None:
+    fname = "2025-01-01T00-00-00+00-00_task_taskid.eval"
+    write_eval_log(view_client.log_dir, fname, status="started")
+    resp = view_client.frontend_request(
+        "POST",
+        view_client.log_url("log-subset-download", fname),
+        json=_subset_body("s0"),
+    )
+    assert resp.status_code == 409
+
+
+def test_api_log_subset_drops_results_when_metrics_unresolvable(
+    view_client: ViewTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _write_scored_log(view_client.log_dir)
+
+    def unresolvable(log: inspect_ai.log.EvalLog) -> None:
+        raise LookupError("metric 'custom/metric' is not registered")
+
+    monkeypatch.setattr(inspect_ai._view.common, "recompute_metrics", unresolvable)
+    resp = view_client.frontend_request(
+        "POST",
+        f"/log-subset-save/{source}",
+        json={**_subset_body("s0"), "file_name": "subset.eval"},
+    )
+    resp.raise_for_status()
+    assert resp.json()["metrics_recomputed"] is False
+    subset = inspect_ai.log.read_eval_log(resp.json()["log_file"])
+    assert subset.results is None
+    assert [s.id for s in subset.samples or []] == ["s0"]
 
 
 def test_api_log_dir(view_client: ViewTestClient) -> None:

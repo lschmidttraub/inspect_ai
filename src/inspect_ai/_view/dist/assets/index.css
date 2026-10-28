@@ -26377,23 +26377,185 @@ pre._value_8citi_25 {
    * the horizontal scroller and keeps the footer pinned in view. */
   min-width: 0;
 }
-._container_1tduz_1 {
+._bar_q9p89_1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25em 0.75em;
+  padding: 0.3em 1em;
+  border-bottom: solid 1px var(--bs-light-border-subtle);
+  background-color: var(--bs-primary-bg-subtle);
+}
+
+._count_q9p89_11 {
+  font-weight: 600;
+}
+
+._saveForm_q9p89_15 {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+._fileName_q9p89_21 {
+  width: 28em;
+  max-width: 60vw;
+  padding: 0.1em 0.4em;
+  font-size: inherit;
+}
+
+._error_q9p89_28 {
+  color: var(--bs-danger-text-emphasis);
+}
+
+._saved_q9p89_32 {
+  color: var(--bs-secondary-color);
+}
+
+._action_q9p89_36 {
+  font-size: inherit;
+  padding: 0.1rem 0.5rem;
+}
+._checkbox_1lhas_1 {
+  margin: 0;
+  cursor: pointer;
+  vertical-align: middle;
+}
+._container_wg5rj_1 {
   display: flex;
   flex-direction: column;
   row-gap: 0.25rem;
   min-width: 10rem;
+  max-width: 24rem;
 }
 
-._row_1tduz_8 {
+._row_wg5rj_9 {
   display: flex;
   align-items: center;
   cursor: pointer;
   margin-bottom: 0;
 }
 
-._checkbox_1tduz_15 {
+._checkbox_wg5rj_16 {
   margin-right: 0.5rem;
   cursor: pointer;
+}
+
+._heading_wg5rj_21 {
+  font-size: var(--inspect-font-size-smallest);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+}
+
+._divider_wg5rj_28 {
+  border-top: solid 1px var(--bs-border-color);
+  margin: 0.25rem 0;
+}
+
+._empty_wg5rj_33 {
+  color: var(--bs-secondary-color);
+  max-width: 16rem;
+}
+
+._viewList_wg5rj_38 {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  row-gap: 0.1rem;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+._viewRow_wg5rj_49 {
+  display: flex;
+  align-items: center;
+  column-gap: 0.25rem;
+  border-radius: var(--bs-border-radius);
+}
+
+._viewRow_wg5rj_49:hover {
+  background-color: var(--bs-tertiary-bg);
+}
+
+._activeView_wg5rj_60 {
+  background-color: var(--bs-primary-bg-subtle);
+}
+
+._viewApply_wg5rj_64 {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1rem auto;
+  column-gap: 0.25rem;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 0.15rem 0.25rem;
+  color: inherit;
+  cursor: pointer;
+}
+
+._check_wg5rj_16 {
+  grid-row: 1;
+  color: var(--bs-primary);
+}
+
+._hidden_wg5rj_83 {
+  visibility: hidden;
+}
+
+._viewName_wg5rj_87 {
+  grid-column: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+._viewFilter_wg5rj_94 {
+  grid-column: 2;
+  font-family: var(--bs-font-monospace);
+  font-size: var(--inspect-font-size-smallest);
+  color: var(--bs-secondary-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+._iconButton_wg5rj_104 {
+  border: none;
+  background: none;
+  padding: 0.15rem 0.3rem;
+  color: var(--bs-secondary-color);
+  cursor: pointer;
+}
+
+._iconButton_wg5rj_104:hover:not(:disabled) {
+  color: var(--bs-body-color);
+}
+
+._iconButton_wg5rj_104:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+._saveForm_wg5rj_121 {
+  display: flex;
+  column-gap: 0.25rem;
+}
+
+._nameInput_wg5rj_126 {
+  flex: 1;
+  min-width: 0;
+  padding: 0.1rem 0.4rem;
+  font-size: inherit;
+}
+
+._saveButton_wg5rj_133 {
+  padding: 0.1rem 0.6rem;
+  font-size: inherit;
 }
 ._root_1dunz_1 {
   display: flex;
