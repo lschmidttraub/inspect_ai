@@ -76251,7 +76251,7 @@ var useFilteredSamples = () => {
 	const samplesDescriptor = useSampleDescriptor();
 	const sampleSummaries = useSelectedSampleSummariesData();
 	const filter = useStore(_temp6$10);
-	const setFilterError = useStore(_temp7$6);
+	const setFilterError = useStore(_temp7$7);
 	const clearFilterError = useStore(_temp8$4);
 	let t0;
 	if ($[0] !== filter || $[1] !== sampleSummaries || $[2] !== samplesDescriptor) {
@@ -76482,7 +76482,7 @@ function _temp5$16(state) {
 function _temp6$10(state) {
 	return state.log.filter;
 }
-function _temp7$6(state_0) {
+function _temp7$7(state_0) {
 	return state_0.logActions.setFilterError;
 }
 function _temp8$4(state_1) {
@@ -88016,7 +88016,7 @@ var LogListGrid = (t0) => {
 				selectedRowId: t29,
 				onSelectedRowChange: handleSelectedRowChange,
 				onRowActivate: handleRowActivate,
-				getRowHref: _temp7$5,
+				getRowHref: _temp7$6,
 				autoFocus: true,
 				ariaLabel: "Evaluation logs",
 				loading: t30
@@ -88069,7 +88069,7 @@ function _temp5$14(row_6) {
 function _temp6$8(row_7) {
 	return row_7.id;
 }
-function _temp7$5(row_8) {
+function _temp7$6(row_8) {
 	return toFullUrlMaybe(row_8.url);
 }
 //#endregion
@@ -129334,7 +129334,7 @@ var EditMetadataDialog = (t0) => {
 	if ($[28] !== entries || $[29] !== removed) {
 		t14 = () => ({
 			type: "metadata",
-			metadata_set: buildMetadataSet(entries.filter(_temp7$4)),
+			metadata_set: buildMetadataSet(entries.filter(_temp7$5)),
 			metadata_remove: removed
 		});
 		$[28] = entries;
@@ -129572,7 +129572,7 @@ function _temp5$8(e_2) {
 function _temp6$6(e_3) {
 	return e_3.key;
 }
-function _temp7$4(e_8) {
+function _temp7$5(e_8) {
 	return e_8.isNew || e_8.dirty;
 }
 var PlanCard_module_default = {
@@ -131000,6 +131000,19 @@ var isSort = (v) => isRecord(v) && typeof v.colId === "string" && (v.dir === "as
 var isSavedSampleView = (v) => isRecord(v) && typeof v.name === "string" && typeof v.filter === "string" && Array.isArray(v.columns) && v.columns.every(isColumn) && Array.isArray(v.sort) && v.sort.every(isSort) && Array.isArray(v.scores) && v.scores.every(isScoreLabel) && typeof v.multiline === "boolean" && typeof v.compactScores === "boolean";
 /** Views from browser storage, which any viewer version may have written:
 *  entries that don't match the current shape are dropped. */ var parseSavedViews = (persisted) => Array.isArray(persisted) ? persisted.filter(isSavedSampleView) : [];
+/** Whether `name` can be given to the view now called `current` (or to a
+*  new view): not blank and not used by another view. */ var isAvailableViewName = (views, name, current) => {
+	const trimmed = name.trim();
+	return trimmed !== "" && !views.some((v) => v.name === trimmed && v.name !== current);
+};
+/** Rename the view `from` to `to` in place. Unchanged if `to` isn't an
+*  available name. */ var renameSavedView = (views, from, to) => {
+	if (!isAvailableViewName(views, to, from)) return [...views];
+	return views.map((v) => v.name === from ? {
+		...v,
+		name: to.trim()
+	} : v);
+};
 /** Insert `view`, replacing any view with the same name in place. */ var upsertSavedView = (views, view) => {
 	const index = views.findIndex((v) => v.name === view.name);
 	if (index < 0) return [...views, view];
@@ -131026,6 +131039,9 @@ var useSavedViews = create()(persist((set) => ({
 	},
 	deleteView: (name) => {
 		set((state) => ({ views: state.views.filter((v) => v.name !== name) }));
+	},
+	renameView: (from, to) => {
+		set((state) => ({ views: renameSavedView(state.views, from, to) }));
 	}
 }), {
 	name: "inspect-saved-sample-views",
@@ -131039,7 +131055,7 @@ var useSavedViews = create()(persist((set) => ({
 //#endregion
 //#region src/app/samples/list/useSavedSampleViews.ts
 function useSavedSampleViews() {
-	const $ = (0, import_compiler_runtime.c)(27);
+	const $ = (0, import_compiler_runtime.c)(28);
 	const { view, patchView } = useSamplesView();
 	const filter = useStore(_temp$25);
 	const setFilter = useStore(_temp2$21);
@@ -131049,6 +131065,7 @@ function useSavedSampleViews() {
 	const views = useSavedViews(_temp4$14);
 	const saveView = useSavedViews(_temp5$7);
 	const deleteView = useSavedViews(_temp6$5);
+	const renameView = useSavedViews(_temp7$4);
 	let snapshot;
 	let t0;
 	let t1;
@@ -131112,24 +131129,29 @@ function useSavedSampleViews() {
 		$[19] = t4;
 	} else t4 = $[19];
 	let t5;
-	if ($[20] !== deleteView || $[21] !== t0 || $[22] !== t1 || $[23] !== t2 || $[24] !== t3 || $[25] !== t4) {
+	if ($[20] !== deleteView || $[21] !== renameView || $[22] !== t0 || $[23] !== t1 || $[24] !== t2 || $[25] !== t3 || $[26] !== t4) {
 		t5 = {
 			views: t0,
 			activeView: t1,
 			saveCurrent: t2,
 			saveWithFilter: t3,
 			apply: t4,
-			remove: deleteView
+			remove: deleteView,
+			rename: renameView
 		};
 		$[20] = deleteView;
-		$[21] = t0;
-		$[22] = t1;
-		$[23] = t2;
-		$[24] = t3;
-		$[25] = t4;
-		$[26] = t5;
-	} else t5 = $[26];
+		$[21] = renameView;
+		$[22] = t0;
+		$[23] = t1;
+		$[24] = t2;
+		$[25] = t3;
+		$[26] = t4;
+		$[27] = t5;
+	} else t5 = $[27];
 	return t5;
+}
+function _temp7$4(state_5) {
+	return state_5.renameView;
 }
 function _temp6$5(state_4) {
 	return state_4.deleteView;
@@ -149509,29 +149531,35 @@ var numberLiteral = (n) => String(n);
 	return parts.join(" and ");
 }
 var SamplesViewOptionsPopover_module_default = {
-	container: "_container_wg5rj_1",
-	row: "_row_wg5rj_9",
-	checkbox: "_checkbox_wg5rj_16",
-	heading: "_heading_wg5rj_21",
-	divider: "_divider_wg5rj_28",
-	empty: "_empty_wg5rj_33",
-	viewList: "_viewList_wg5rj_38",
-	viewRow: "_viewRow_wg5rj_49",
-	activeView: "_activeView_wg5rj_60",
-	viewApply: "_viewApply_wg5rj_64",
-	check: "_check_wg5rj_16",
-	hidden: "_hidden_wg5rj_83",
-	viewName: "_viewName_wg5rj_87",
-	viewFilter: "_viewFilter_wg5rj_94",
-	iconButton: "_iconButton_wg5rj_104",
-	saveForm: "_saveForm_wg5rj_121",
-	nameInput: "_nameInput_wg5rj_126",
-	saveButton: "_saveButton_wg5rj_133"
+	container: "_container_17wwi_1",
+	row: "_row_17wwi_9",
+	checkbox: "_checkbox_17wwi_16",
+	heading: "_heading_17wwi_21",
+	divider: "_divider_17wwi_28",
+	empty: "_empty_17wwi_33",
+	viewList: "_viewList_17wwi_38",
+	viewRow: "_viewRow_17wwi_49",
+	activeView: "_activeView_17wwi_60",
+	viewApply: "_viewApply_17wwi_64",
+	check: "_check_17wwi_16",
+	hidden: "_hidden_17wwi_83",
+	viewName: "_viewName_17wwi_87",
+	viewFilter: "_viewFilter_17wwi_94",
+	iconButton: "_iconButton_17wwi_104",
+	saveForm: "_saveForm_17wwi_121",
+	nameInput: "_nameInput_17wwi_126",
+	saveButton: "_saveButton_17wwi_133",
+	renameForm: "_renameForm_17wwi_138"
 };
 //#endregion
 //#region src/app/samples/list/SamplesViewOptionsPopover.tsx
+var focusAndSelect = (el) => {
+	if (!el) return;
+	el.focus();
+	el.select();
+};
 var SamplesViewOptionsPopover = (t0) => {
-	const $ = (0, import_compiler_runtime.c)(60);
+	const $ = (0, import_compiler_runtime.c)(71);
 	const { showing, setShowing, positionEl } = t0;
 	const { view, setMultiline, setCompactScores, setColorScalesEnabled } = useSamplesView();
 	const scoreColorScales = useSamplesViewScoreColorScales();
@@ -149552,40 +149580,74 @@ var SamplesViewOptionsPopover = (t0) => {
 	} else t2 = $[3];
 	const trimmedName = t2;
 	const replacing = savedViews.views.some((v) => v.name === trimmedName);
+	const [renaming, setRenaming] = (0, import_react.useState)(void 0);
 	let t3;
-	if ($[4] !== savedViews || $[5] !== trimmedName) {
-		t3 = (e) => {
+	if ($[4] !== renaming || $[5] !== savedViews.views) {
+		t3 = renaming !== void 0 && isAvailableViewName(savedViews.views, renaming.name, renaming.from);
+		$[4] = renaming;
+		$[5] = savedViews.views;
+		$[6] = t3;
+	} else t3 = $[6];
+	const renameValid = t3;
+	let t4;
+	if ($[7] !== renameValid || $[8] !== renaming || $[9] !== savedViews) {
+		t4 = (e) => {
 			e.preventDefault();
+			if (!renaming || !renameValid) return;
+			savedViews.rename(renaming.from, renaming.name);
+			setRenaming(void 0);
+		};
+		$[7] = renameValid;
+		$[8] = renaming;
+		$[9] = savedViews;
+		$[10] = t4;
+	} else t4 = $[10];
+	const handleRename = t4;
+	let t5;
+	if ($[11] === Symbol.for("react.memo_cache_sentinel")) {
+		t5 = (e_0) => {
+			if (e_0.key !== "Escape") return;
+			e_0.preventDefault();
+			e_0.stopPropagation();
+			setRenaming(void 0);
+		};
+		$[11] = t5;
+	} else t5 = $[11];
+	const handleRenameKeyDown = t5;
+	let t6;
+	if ($[12] !== savedViews || $[13] !== trimmedName) {
+		t6 = (e_1) => {
+			e_1.preventDefault();
 			if (!trimmedName) return;
 			savedViews.saveCurrent(trimmedName);
 			setNewViewName("");
 		};
-		$[4] = savedViews;
-		$[5] = trimmedName;
-		$[6] = t3;
-	} else t3 = $[6];
-	const handleSave = t3;
-	let t4;
-	let t5;
-	let t6;
-	if ($[7] === Symbol.for("react.memo_cache_sentinel")) {
-		t4 = [0, 1];
-		t5 = clsx(SamplesViewOptionsPopover_module_default.container, "text-size-small");
-		t6 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", {
+		$[12] = savedViews;
+		$[13] = trimmedName;
+		$[14] = t6;
+	} else t6 = $[14];
+	const handleSave = t6;
+	let t7;
+	let t8;
+	let t9;
+	if ($[15] === Symbol.for("react.memo_cache_sentinel")) {
+		t7 = [0, 1];
+		t8 = clsx(SamplesViewOptionsPopover_module_default.container, "text-size-small");
+		t9 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", {
 			className: SamplesViewOptionsPopover_module_default.heading,
 			children: "Saved views"
 		});
-		$[7] = t4;
-		$[8] = t5;
-		$[9] = t6;
+		$[15] = t7;
+		$[16] = t8;
+		$[17] = t9;
 	} else {
-		t4 = $[7];
-		t5 = $[8];
-		t6 = $[9];
+		t7 = $[15];
+		t8 = $[16];
+		t9 = $[17];
 	}
-	let t7;
-	if ($[10] !== savedViews) {
-		t7 = savedViews.views.length === 0 ? /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", {
+	let t10;
+	if ($[18] !== handleRename || $[19] !== renameValid || $[20] !== renaming || $[21] !== savedViews) {
+		t10 = savedViews.views.length === 0 ? /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", {
 			className: SamplesViewOptionsPopover_module_default.empty,
 			children: "Save the current filter, columns, sort and layout to reuse them on any log."
 		}) : /*#__PURE__*/ (0, import_jsx_runtime.jsx)("ul", {
@@ -149593,6 +149655,45 @@ var SamplesViewOptionsPopover = (t0) => {
 			"aria-label": "Saved views",
 			children: savedViews.views.map((saved) => {
 				const active = saved === savedViews.activeView;
+				if (renaming?.from === saved.name) return /*#__PURE__*/ (0, import_jsx_runtime.jsx)("li", {
+					className: SamplesViewOptionsPopover_module_default.viewRow,
+					children: /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("form", {
+						className: SamplesViewOptionsPopover_module_default.renameForm,
+						onSubmit: handleRename,
+						children: [
+							/*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
+								type: "text",
+								className: clsx("form-control", SamplesViewOptionsPopover_module_default.nameInput),
+								"aria-label": `New name for ${saved.name}`,
+								"aria-invalid": !renameValid,
+								title: renameValid ? void 0 : "Another view already has this name",
+								value: renaming.name,
+								onChange: (e_2) => setRenaming({
+									...renaming,
+									name: e_2.target.value
+								}),
+								onKeyDown: handleRenameKeyDown,
+								ref: focusAndSelect
+							}),
+							/*#__PURE__*/ (0, import_jsx_runtime.jsx)("button", {
+								type: "submit",
+								className: SamplesViewOptionsPopover_module_default.iconButton,
+								"aria-label": "Save name",
+								title: "Save name",
+								disabled: !renameValid,
+								children: /*#__PURE__*/ (0, import_jsx_runtime.jsx)(Icon, { name: "confirm" })
+							}),
+							/*#__PURE__*/ (0, import_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: SamplesViewOptionsPopover_module_default.iconButton,
+								"aria-label": "Cancel rename",
+								title: "Cancel",
+								onClick: () => setRenaming(void 0),
+								children: /*#__PURE__*/ (0, import_jsx_runtime.jsx)(Icon, { name: "close" })
+							})
+						]
+					})
+				}, saved.name);
 				return /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("li", {
 					className: clsx(SamplesViewOptionsPopover_module_default.viewRow, active && SamplesViewOptionsPopover_module_default.activeView),
 					children: [
@@ -149620,6 +149721,17 @@ var SamplesViewOptionsPopover = (t0) => {
 						/*#__PURE__*/ (0, import_jsx_runtime.jsx)("button", {
 							type: "button",
 							className: SamplesViewOptionsPopover_module_default.iconButton,
+							title: `Rename "${saved.name}"`,
+							"aria-label": `Rename ${saved.name}`,
+							onClick: () => setRenaming({
+								from: saved.name,
+								name: saved.name
+							}),
+							children: /*#__PURE__*/ (0, import_jsx_runtime.jsx)(Icon, { name: "edit" })
+						}),
+						/*#__PURE__*/ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: SamplesViewOptionsPopover_module_default.iconButton,
 							title: `Update "${saved.name}" to the current view`,
 							"aria-label": `Update ${saved.name}`,
 							disabled: active,
@@ -149638,149 +149750,152 @@ var SamplesViewOptionsPopover = (t0) => {
 				}, saved.name);
 			})
 		});
-		$[10] = savedViews;
-		$[11] = t7;
-	} else t7 = $[11];
-	let t8;
-	if ($[12] === Symbol.for("react.memo_cache_sentinel")) {
-		t8 = clsx("form-control", SamplesViewOptionsPopover_module_default.nameInput);
-		$[12] = t8;
-	} else t8 = $[12];
-	let t9;
-	if ($[13] === Symbol.for("react.memo_cache_sentinel")) {
-		t9 = (e_0) => setNewViewName(e_0.target.value);
-		$[13] = t9;
-	} else t9 = $[13];
-	let t10;
-	if ($[14] !== newViewName) {
-		t10 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
+		$[18] = handleRename;
+		$[19] = renameValid;
+		$[20] = renaming;
+		$[21] = savedViews;
+		$[22] = t10;
+	} else t10 = $[22];
+	let t11;
+	if ($[23] === Symbol.for("react.memo_cache_sentinel")) {
+		t11 = clsx("form-control", SamplesViewOptionsPopover_module_default.nameInput);
+		$[23] = t11;
+	} else t11 = $[23];
+	let t12;
+	if ($[24] === Symbol.for("react.memo_cache_sentinel")) {
+		t12 = (e_3) => setNewViewName(e_3.target.value);
+		$[24] = t12;
+	} else t12 = $[24];
+	let t13;
+	if ($[25] !== newViewName) {
+		t13 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
 			type: "text",
-			className: t8,
+			className: t11,
 			placeholder: "New view name",
 			"aria-label": "New view name",
 			value: newViewName,
-			onChange: t9
+			onChange: t12
 		});
-		$[14] = newViewName;
-		$[15] = t10;
-	} else t10 = $[15];
-	let t11;
-	if ($[16] === Symbol.for("react.memo_cache_sentinel")) {
-		t11 = clsx("btn", "btn-primary", SamplesViewOptionsPopover_module_default.saveButton);
-		$[16] = t11;
-	} else t11 = $[16];
-	const t12 = !trimmedName;
-	const t13 = replacing ? `Replace "${trimmedName}" with the current view` : "Save the current view";
-	const t14 = replacing ? "Replace" : "Save";
-	let t15;
-	if ($[17] !== t12 || $[18] !== t13 || $[19] !== t14) {
-		t15 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("button", {
+		$[25] = newViewName;
+		$[26] = t13;
+	} else t13 = $[26];
+	let t14;
+	if ($[27] === Symbol.for("react.memo_cache_sentinel")) {
+		t14 = clsx("btn", "btn-primary", SamplesViewOptionsPopover_module_default.saveButton);
+		$[27] = t14;
+	} else t14 = $[27];
+	const t15 = !trimmedName;
+	const t16 = replacing ? `Replace "${trimmedName}" with the current view` : "Save the current view";
+	const t17 = replacing ? "Replace" : "Save";
+	let t18;
+	if ($[28] !== t15 || $[29] !== t16 || $[30] !== t17) {
+		t18 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("button", {
 			type: "submit",
-			className: t11,
-			disabled: t12,
-			title: t13,
-			children: t14
+			className: t14,
+			disabled: t15,
+			title: t16,
+			children: t17
 		});
-		$[17] = t12;
-		$[18] = t13;
-		$[19] = t14;
-		$[20] = t15;
-	} else t15 = $[20];
-	let t16;
-	if ($[21] !== handleSave || $[22] !== t10 || $[23] !== t15) {
-		t16 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("form", {
+		$[28] = t15;
+		$[29] = t16;
+		$[30] = t17;
+		$[31] = t18;
+	} else t18 = $[31];
+	let t19;
+	if ($[32] !== handleSave || $[33] !== t13 || $[34] !== t18) {
+		t19 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("form", {
 			className: SamplesViewOptionsPopover_module_default.saveForm,
 			onSubmit: handleSave,
-			children: [t10, t15]
+			children: [t13, t18]
 		});
-		$[21] = handleSave;
-		$[22] = t10;
-		$[23] = t15;
-		$[24] = t16;
-	} else t16 = $[24];
-	let t17;
-	let t18;
-	if ($[25] === Symbol.for("react.memo_cache_sentinel")) {
-		t17 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", { className: SamplesViewOptionsPopover_module_default.divider });
-		t18 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", {
+		$[32] = handleSave;
+		$[33] = t13;
+		$[34] = t18;
+		$[35] = t19;
+	} else t19 = $[35];
+	let t20;
+	let t21;
+	if ($[36] === Symbol.for("react.memo_cache_sentinel")) {
+		t20 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", { className: SamplesViewOptionsPopover_module_default.divider });
+		t21 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", {
 			className: SamplesViewOptionsPopover_module_default.heading,
 			children: "Display"
 		});
-		$[25] = t17;
-		$[26] = t18;
+		$[36] = t20;
+		$[37] = t21;
 	} else {
-		t17 = $[25];
-		t18 = $[26];
+		t20 = $[36];
+		t21 = $[37];
 	}
-	let t19;
-	if ($[27] !== setMultiline || $[28] !== view.multiline) {
-		t19 = () => setMultiline(!view.multiline);
-		$[27] = setMultiline;
-		$[28] = view.multiline;
-		$[29] = t19;
-	} else t19 = $[29];
-	let t20;
-	if ($[30] !== t19 || $[31] !== view.multiline) {
-		t20 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
+	let t22;
+	if ($[38] !== setMultiline || $[39] !== view.multiline) {
+		t22 = () => setMultiline(!view.multiline);
+		$[38] = setMultiline;
+		$[39] = view.multiline;
+		$[40] = t22;
+	} else t22 = $[40];
+	let t23;
+	if ($[41] !== t22 || $[42] !== view.multiline) {
+		t23 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
 			type: "checkbox",
 			checked: view.multiline,
-			onChange: t19,
+			onChange: t22,
 			className: SamplesViewOptionsPopover_module_default.checkbox
 		});
-		$[30] = t19;
-		$[31] = view.multiline;
-		$[32] = t20;
-	} else t20 = $[32];
-	let t21;
-	if ($[33] === Symbol.for("react.memo_cache_sentinel")) {
-		t21 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("span", { children: "Multiline" });
-		$[33] = t21;
-	} else t21 = $[33];
-	let t22;
-	if ($[34] !== t20) {
-		t22 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("label", {
-			className: SamplesViewOptionsPopover_module_default.row,
-			children: [t20, t21]
-		});
-		$[34] = t20;
-		$[35] = t22;
-	} else t22 = $[35];
-	let t23;
-	if ($[36] !== setCompactScores || $[37] !== view.compactScores) {
-		t23 = () => setCompactScores(!view.compactScores);
-		$[36] = setCompactScores;
-		$[37] = view.compactScores;
-		$[38] = t23;
-	} else t23 = $[38];
+		$[41] = t22;
+		$[42] = view.multiline;
+		$[43] = t23;
+	} else t23 = $[43];
 	let t24;
-	if ($[39] !== t23 || $[40] !== view.compactScores) {
-		t24 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
+	if ($[44] === Symbol.for("react.memo_cache_sentinel")) {
+		t24 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("span", { children: "Multiline" });
+		$[44] = t24;
+	} else t24 = $[44];
+	let t25;
+	if ($[45] !== t23) {
+		t25 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("label", {
+			className: SamplesViewOptionsPopover_module_default.row,
+			children: [t23, t24]
+		});
+		$[45] = t23;
+		$[46] = t25;
+	} else t25 = $[46];
+	let t26;
+	if ($[47] !== setCompactScores || $[48] !== view.compactScores) {
+		t26 = () => setCompactScores(!view.compactScores);
+		$[47] = setCompactScores;
+		$[48] = view.compactScores;
+		$[49] = t26;
+	} else t26 = $[49];
+	let t27;
+	if ($[50] !== t26 || $[51] !== view.compactScores) {
+		t27 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
 			type: "checkbox",
 			checked: view.compactScores,
-			onChange: t23,
+			onChange: t26,
 			className: SamplesViewOptionsPopover_module_default.checkbox
 		});
-		$[39] = t23;
-		$[40] = view.compactScores;
-		$[41] = t24;
-	} else t24 = $[41];
-	let t25;
-	if ($[42] === Symbol.for("react.memo_cache_sentinel")) {
-		t25 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("span", { children: "Compact scores" });
-		$[42] = t25;
-	} else t25 = $[42];
-	let t26;
-	if ($[43] !== t24) {
-		t26 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("label", {
+		$[50] = t26;
+		$[51] = view.compactScores;
+		$[52] = t27;
+	} else t27 = $[52];
+	let t28;
+	if ($[53] === Symbol.for("react.memo_cache_sentinel")) {
+		t28 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("span", { children: "Compact scores" });
+		$[53] = t28;
+	} else t28 = $[53];
+	let t29;
+	if ($[54] !== t27) {
+		t29 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("label", {
 			className: SamplesViewOptionsPopover_module_default.row,
-			children: [t24, t25]
+			children: [t27, t28]
 		});
-		$[43] = t24;
-		$[44] = t26;
-	} else t26 = $[44];
-	let t27;
-	if ($[45] !== setColorScalesEnabled || $[46] !== showColorScales || $[47] !== view.colorScalesEnabled) {
-		t27 = showColorScales && /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("label", {
+		$[54] = t27;
+		$[55] = t29;
+	} else t29 = $[55];
+	let t30;
+	if ($[56] !== setColorScalesEnabled || $[57] !== showColorScales || $[58] !== view.colorScalesEnabled) {
+		t30 = showColorScales && /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("label", {
 			className: SamplesViewOptionsPopover_module_default.row,
 			children: [/*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
 				type: "checkbox",
@@ -149789,36 +149904,36 @@ var SamplesViewOptionsPopover = (t0) => {
 				className: SamplesViewOptionsPopover_module_default.checkbox
 			}), /*#__PURE__*/ (0, import_jsx_runtime.jsx)("span", { children: "Score colors" })]
 		});
-		$[45] = setColorScalesEnabled;
-		$[46] = showColorScales;
-		$[47] = view.colorScalesEnabled;
-		$[48] = t27;
-	} else t27 = $[48];
-	let t28;
-	if ($[49] !== t16 || $[50] !== t22 || $[51] !== t26 || $[52] !== t27 || $[53] !== t7) {
-		t28 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("div", {
-			className: t5,
+		$[56] = setColorScalesEnabled;
+		$[57] = showColorScales;
+		$[58] = view.colorScalesEnabled;
+		$[59] = t30;
+	} else t30 = $[59];
+	let t31;
+	if ($[60] !== t10 || $[61] !== t19 || $[62] !== t25 || $[63] !== t29 || $[64] !== t30) {
+		t31 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("div", {
+			className: t8,
 			children: [
-				t6,
-				t7,
-				t16,
-				t17,
-				t18,
-				t22,
-				t26,
-				t27
+				t9,
+				t10,
+				t19,
+				t20,
+				t21,
+				t25,
+				t29,
+				t30
 			]
 		});
-		$[49] = t16;
-		$[50] = t22;
-		$[51] = t26;
-		$[52] = t27;
-		$[53] = t7;
-		$[54] = t28;
-	} else t28 = $[54];
-	let t29;
-	if ($[55] !== positionEl || $[56] !== setShowing || $[57] !== showing || $[58] !== t28) {
-		t29 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)(PopOver, {
+		$[60] = t10;
+		$[61] = t19;
+		$[62] = t25;
+		$[63] = t29;
+		$[64] = t30;
+		$[65] = t31;
+	} else t31 = $[65];
+	let t32;
+	if ($[66] !== positionEl || $[67] !== setShowing || $[68] !== showing || $[69] !== t31) {
+		t32 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)(PopOver, {
 			id: "samples-view-options-popover",
 			isOpen: showing,
 			setIsOpen: setShowing,
@@ -149827,16 +149942,16 @@ var SamplesViewOptionsPopover = (t0) => {
 			showArrow: false,
 			hoverDelay: -1,
 			closeOnMouseLeave: false,
-			offset: t4,
-			children: t28
+			offset: t7,
+			children: t31
 		});
-		$[55] = positionEl;
-		$[56] = setShowing;
-		$[57] = showing;
-		$[58] = t28;
-		$[59] = t29;
-	} else t29 = $[59];
-	return t29;
+		$[66] = positionEl;
+		$[67] = setShowing;
+		$[68] = showing;
+		$[69] = t31;
+		$[70] = t32;
+	} else t32 = $[70];
+	return t32;
 };
 //#endregion
 //#region ../../node_modules/.pnpm/@codemirror+autocomplete@6.20.4/node_modules/@codemirror/autocomplete/dist/index.js
