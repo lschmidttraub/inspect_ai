@@ -48890,23 +48890,31 @@ function zip64Number(view, offset) {
 	}
 	const centralDirectory = parseCentralDirectory(await read(centralDirOffset, centralDirSize));
 	for (const entry of centralDirectory.values()) validateRange(entry.fileOffset, 30 + entry.filenameLength + entry.compressedSize, length);
+	const readPayload = async (file, maxBytes, onProgress) => {
+		const entry = centralDirectory.get(file);
+		if (!entry) throw new Error(`File not found: ${file}`);
+		validateSize(entry.uncompressedSize, file, maxBytes);
+		const minimumSize = 30 + entry.filenameLength + entry.compressedSize;
+		validateSize(minimumSize, file, maxBytes);
+		const estimatedSize = Math.min(minimumSize + 256, length - entry.fileOffset, MAX_ZIP_READ_BYTES);
+		let fileData = await read(entry.fileOffset, estimatedSize, onProgress);
+		const view = dataView(fileData);
+		const actualTotal = 30 + view.getUint16(26, true) + view.getUint16(28, true) + entry.compressedSize;
+		validateRange(entry.fileOffset, actualTotal, length);
+		validateSize(actualTotal, file, maxBytes);
+		if (actualTotal > fileData.length) fileData = await read(entry.fileOffset, actualTotal);
+		return {
+			entry,
+			payload: parseZipFileEntry(file, fileData, entry)
+		};
+	};
 	return {
 		centralDirectory,
 		readFile: async (file, maxBytes, onProgress) => {
-			const entry = centralDirectory.get(file);
-			if (!entry) throw new Error(`File not found: ${file}`);
-			validateSize(entry.uncompressedSize, file, maxBytes);
-			const minimumSize = 30 + entry.filenameLength + entry.compressedSize;
-			validateSize(minimumSize, file, maxBytes);
-			const estimatedSize = Math.min(minimumSize + 256, length - entry.fileOffset, MAX_ZIP_READ_BYTES);
-			let fileData = await read(entry.fileOffset, estimatedSize, onProgress);
-			const view = dataView(fileData);
-			const actualTotal = 30 + view.getUint16(26, true) + view.getUint16(28, true) + entry.compressedSize;
-			validateRange(entry.fileOffset, actualTotal, length);
-			validateSize(actualTotal, file, maxBytes);
-			if (actualTotal > fileData.length) fileData = await read(entry.fileOffset, actualTotal);
-			return decompressData(parseZipFileEntry(file, fileData, entry), entry.compressionMethod, entry.uncompressedSize, file);
-		}
+			const { entry, payload } = await readPayload(file, maxBytes, onProgress);
+			return decompressData(payload, entry.compressionMethod, entry.uncompressedSize, file);
+		},
+		readRawFile: async (file, maxBytes) => (await readPayload(file, maxBytes)).payload
 	};
 };
 /** Opens an in-memory ZIP archive using the same metadata validation as remote reads. */ var openZipFileFromBuffer = (bytes) => openRemoteZipFile("in-memory ZIP", bytes.length, (_url, start, end) => Promise.resolve(bytes.slice(start, end + 1)));
@@ -48997,6 +49005,7 @@ function parseCentralDirectory(buffer) {
 		entries.set(filename, {
 			filename,
 			compressionMethod: view.getUint16(offset + 10, true),
+			crc32: view.getUint32(offset + 16, true),
 			compressedSize,
 			uncompressedSize,
 			fileOffset,
@@ -49594,6 +49603,179 @@ var createMiddlewareWrapper = (middlewares) => {
 	};
 };
 //#endregion
+//#region src/client/remote/zipWriter.ts
+/** An entry to write: `data` is already in `compressionMethod`'s encoding. */ var kMethodStored = 0;
+var kMethodDeflate = 8;
+var kFlagUtf8 = 2048;
+var kMaxClassic = 4294967295;
+var crcTable;
+var crc32 = (bytes) => {
+	crcTable ??= Uint32Array.from({ length: 256 }, (_, n) => {
+		let c = n;
+		for (let k = 0; k < 8; k++) c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
+		return c >>> 0;
+	});
+	let crc = 4294967295;
+	for (const byte of bytes) crc = crcTable[(crc ^ byte) & 255] ^ crc >>> 8;
+	return (crc ^ 4294967295) >>> 0;
+};
+/** An uncompressed entry for `data`. */ var storedEntry = (name, data) => ({
+	name,
+	data,
+	compressionMethod: kMethodStored,
+	crc32: crc32(data),
+	uncompressedSize: data.length
+});
+var versionNeeded = (method) => method === kMethodStored || method === kMethodDeflate ? 20 : 63;
+/**
+* Write a ZIP archive from entries whose data is already encoded, so entries
+* read raw from another archive are copied without recompressing. Writes the
+* classic format only: an archive that would need ZIP64 (4 GiB or 65535
+* entries) is rejected.
+*/ var writeZip = (entries) => {
+	if (entries.length > 65535) throw new Error("Too many files for a ZIP archive written in the browser");
+	const encoder = new TextEncoder();
+	const names = entries.map((e) => encoder.encode(e.name));
+	const localSize = entries.reduce((n, e, i) => n + 30 + names[i].length + e.data.length, 0);
+	const centralSize = names.reduce((n, name) => n + 46 + name.length, 0);
+	if (localSize + centralSize > kMaxClassic || entries.some((e) => e.uncompressedSize > kMaxClassic)) throw new Error("The selected samples are too large (over 4 GiB) to download from the browser");
+	const out = new Uint8Array(localSize + centralSize + 22);
+	const view = new DataView(out.buffer);
+	const offsets = [];
+	let pos = 0;
+	entries.forEach((entry, i) => {
+		const name = names[i];
+		offsets.push(pos);
+		view.setUint32(pos, 67324752, true);
+		view.setUint16(pos + 4, versionNeeded(entry.compressionMethod), true);
+		view.setUint16(pos + 6, kFlagUtf8, true);
+		view.setUint16(pos + 8, entry.compressionMethod, true);
+		view.setUint16(pos + 10, 0, true);
+		view.setUint16(pos + 12, 33, true);
+		view.setUint32(pos + 14, entry.crc32, true);
+		view.setUint32(pos + 18, entry.data.length, true);
+		view.setUint32(pos + 22, entry.uncompressedSize, true);
+		view.setUint16(pos + 26, name.length, true);
+		view.setUint16(pos + 28, 0, true);
+		out.set(name, pos + 30);
+		out.set(entry.data, pos + 30 + name.length);
+		pos += 30 + name.length + entry.data.length;
+	});
+	const centralStart = pos;
+	entries.forEach((entry, i) => {
+		const name = names[i];
+		view.setUint32(pos, 33639248, true);
+		view.setUint16(pos + 4, versionNeeded(entry.compressionMethod), true);
+		view.setUint16(pos + 6, versionNeeded(entry.compressionMethod), true);
+		view.setUint16(pos + 8, kFlagUtf8, true);
+		view.setUint16(pos + 10, entry.compressionMethod, true);
+		view.setUint16(pos + 12, 0, true);
+		view.setUint16(pos + 14, 33, true);
+		view.setUint32(pos + 16, entry.crc32, true);
+		view.setUint32(pos + 20, entry.data.length, true);
+		view.setUint32(pos + 24, entry.uncompressedSize, true);
+		view.setUint16(pos + 28, name.length, true);
+		view.setUint32(pos + 42, offsets[i], true);
+		out.set(name, pos + 46);
+		pos += 46 + name.length;
+	});
+	view.setUint32(pos, 101010256, true);
+	view.setUint16(pos + 8, entries.length, true);
+	view.setUint16(pos + 10, entries.length, true);
+	view.setUint32(pos + 12, pos - centralStart, true);
+	view.setUint32(pos + 16, centralStart, true);
+	return out;
+};
+//#endregion
+//#region src/client/remote/logSubset.ts
+var kHeaderFile = "header.json";
+var kSummariesFile = "summaries.json";
+var kJournalSummariesDir = "_journal/summaries/";
+var kSampleReadConcurrency = 6;
+var refKey = (id, epoch) => JSON.stringify([id, epoch]);
+var sampleFile = (ref) => `samples/${ref.id}_epoch_${ref.epoch}.json`;
+var kNonFinite = "__inspect_subset_nonfinite__";
+var kNonFiniteToken = new RegExp(`"${kNonFinite}(NaN|Infinity|-Infinity)"`, "g");
+var encodeJson = (value) => new TextEncoder().encode(JSON.stringify(value, (_key, v) => typeof v === "number" && !Number.isFinite(v) ? `${kNonFinite}${v}` : v).replace(kNonFiniteToken, "$1"));
+var randomId = () => Array.from(crypto.getRandomValues(/* @__PURE__ */ new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+var readJson$1 = async (source, file) => asyncJsonParseBytes(await source.readFile(file));
+var journalIndex = (file) => Number(file.slice(19).replace(/\.json$/, ""));
+/** Summary rows in write order: `summaries.json`, else the journal files. */ var readSummaryRows = async (source) => {
+	const files = source.centralDirectory.has(kSummariesFile) ? [kSummariesFile] : [...source.centralDirectory.keys()].filter((f) => f.startsWith(kJournalSummariesDir) && f.endsWith(".json")).sort((a, b) => journalIndex(a) - journalIndex(b));
+	const rows = [];
+	for (const file of files) {
+		const parsed = await readJson$1(source, file);
+		if (!Array.isArray(parsed)) throw new Error(`Expected an array in ${file}`);
+		const fileRows = parsed;
+		rows.push(...fileRows);
+	}
+	return rows;
+};
+var readSampleEntries = async (source, samples) => {
+	const entries = new Array(samples.length);
+	let next = 0;
+	const worker = async () => {
+		while (next < samples.length) {
+			const index = next++;
+			const ref = samples[index];
+			const name = sampleFile(ref);
+			const entry = source.centralDirectory.get(name);
+			if (!entry) throw new Error(`Sample ${ref.id} (epoch ${ref.epoch}) is not in the log.`);
+			entries[index] = {
+				name,
+				data: await source.readRawFile(name),
+				compressionMethod: entry.compressionMethod,
+				crc32: entry.crc32,
+				uncompressedSize: entry.uncompressedSize
+			};
+		}
+	};
+	await Promise.all(Array.from({ length: Math.min(kSampleReadConcurrency, samples.length) }, worker));
+	return entries;
+};
+/**
+* Build a .eval log holding only `samples` of the log in `source`, in the
+* browser (for hosts with no view server, like a bundled Space). Sample
+* entries are copied without recompressing. Like the view server's subsets,
+* the new log gets fresh `eval_id`/`task_id` values and records its source
+* under `eval.metadata.subset_of`. Its aggregate `results` are removed:
+* metrics can only be rebuilt in Python (`inspect_ai.log.recompute_metrics`).
+*/ var buildLogSubset = async (source, samples, sourceLog) => {
+	if (samples.length === 0) throw new Error("No samples were selected.");
+	if (!source.centralDirectory.has(kHeaderFile)) throw new Error("Cannot copy samples from a log that is still in progress (it has no header yet).");
+	const header = await readJson$1(source, kHeaderFile);
+	if (!isRecord(header) || !isRecord(header.eval)) throw new Error(`Unexpected ${kHeaderFile} in the log`);
+	const metadata = isRecord(header.eval.metadata) ? header.eval.metadata : {};
+	const subsetHeader = {
+		...header,
+		eval: {
+			...header.eval,
+			eval_id: randomId(),
+			task_id: randomId(),
+			metadata: {
+				...metadata,
+				subset_of: {
+					log: sourceLog,
+					samples: samples.length
+				}
+			}
+		},
+		results: null
+	};
+	const wanted = new Set(samples.map((s) => refKey(s.id, s.epoch)));
+	const summaries = /* @__PURE__ */ new Map();
+	for (const row of await readSummaryRows(source)) {
+		if (!isRecord(row)) continue;
+		const key = refKey(row.id, row.epoch);
+		if (wanted.has(key)) summaries.set(key, row);
+	}
+	return writeZip([
+		...await readSampleEntries(source, samples),
+		storedEntry(kSummariesFile, encodeJson(samples.flatMap((s) => summaries.get(refKey(s.id, s.epoch)) ?? []))),
+		storedEntry(kHeaderFile, encodeJson(subsetHeader))
+	]);
+};
+//#endregion
 //#region src/client/api/shared/api-shared.ts
 /**
 * Downloads the provided content as a file using the browser's DOM API
@@ -49815,6 +49997,10 @@ var kFallbackAppConfig = {
 		},
 		get_app_config: () => Promise.resolve(app_config),
 		download_file,
+		download_log_subset: async (log_file, samples, file_name) => {
+			if (!log_file.endsWith(".eval")) throw new Error("Only .eval logs can be exported from a static log viewer.");
+			await download_file(file_name, await buildLogSubset(await openRemoteZipFile(log_file), samples, log_file));
+		},
 		open_log_file
 	};
 }
