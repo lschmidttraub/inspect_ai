@@ -860,6 +860,154 @@ def test_api_log_subset_drops_results_when_metrics_unresolvable(
     assert [s.id for s in subset.samples or []] == ["s0"]
 
 
+def _saved_views_client(
+    tmp_path: Path, access_policy: AccessPolicy | None = None
+) -> tuple[TestClient, Path]:
+    views_file = tmp_path / "data" / "saved_views.json"
+    app = fastapi_server.view_server_app(
+        default_dir=str(tmp_path),
+        saved_views_file=views_file,
+        access_policy=access_policy,
+    )
+    return fastapi.testclient.TestClient(app), views_file
+
+
+def _view(name: str, filter: str = "") -> dict[str, Any]:
+    return {"name": name, "filter": filter, "columns": [], "sort": []}
+
+
+def _views_url(folder: str) -> str:
+    return f"/saved-views?folder={urllib.parse.quote(folder)}"
+
+
+def test_api_saved_views_round_trip(tmp_path: Path) -> None:
+    client, views_file = _saved_views_client(tmp_path)
+    folder = f"{tmp_path}/ib"
+    empty = client.get(_views_url(folder)).json()
+    assert empty == {
+        "views": [],
+        "folder": folder,
+        "path": views_file.as_posix(),
+        "legacy_views_folder": None,
+    }
+
+    views = [_view("hacks", 'id in ("a", "b")'), _view("all")]
+    resp = client.put(
+        _views_url(folder), json={"views": views}, headers=FRONTEND_REQUEST_HEADERS
+    )
+    resp.raise_for_status()
+    assert client.get(_views_url(folder)).json()["views"] == views
+    on_disk = json.loads(views_file.read_text())
+    assert on_disk == {"version": 1, "folders": {folder: views}}
+
+    # a fresh server (a restart) reads the same file
+    restarted, _ = _saved_views_client(tmp_path)
+    assert restarted.get(_views_url(folder)).json()["views"] == views
+
+
+def test_api_saved_views_are_per_folder(tmp_path: Path) -> None:
+    client, views_file = _saved_views_client(tmp_path)
+    ib, sorh = f"{tmp_path}/ib", f"{tmp_path}/sorh"
+    for folder, name in ((ib, "ib view"), (sorh, "sorh view")):
+        client.put(
+            _views_url(folder),
+            json={"views": [_view(name)]},
+            headers=FRONTEND_REQUEST_HEADERS,
+        ).raise_for_status()
+
+    assert [v["name"] for v in client.get(_views_url(ib)).json()["views"]] == [
+        "ib view"
+    ]
+    # file URIs and trailing slashes name the same folder
+    same = client.get(_views_url(f"file://{sorh}/")).json()
+    assert same["folder"] == sorh
+    assert [v["name"] for v in same["views"]] == ["sorh view"]
+
+    # clearing a folder's views removes only that folder
+    client.put(
+        _views_url(ib), json={"views": []}, headers=FRONTEND_REQUEST_HEADERS
+    ).raise_for_status()
+    assert list(json.loads(views_file.read_text())["folders"]) == [sorh]
+
+
+def test_api_saved_views_reports_the_legacy_views_folder(tmp_path: Path) -> None:
+    client, views_file = _saved_views_client(tmp_path)
+    views_file.parent.mkdir(parents=True)
+    views_file.write_text(
+        json.dumps(
+            {"version": 1, "folders": {}, "legacy_views_folder": f"{tmp_path}/ib/"}
+        )
+    )
+    body = client.get(_views_url(f"{tmp_path}/sorh")).json()
+    assert body["legacy_views_folder"] == f"{tmp_path}/ib"
+    # saving keeps the setting
+    client.put(
+        _views_url(f"{tmp_path}/ib"),
+        json={"views": [_view("x")]},
+        headers=FRONTEND_REQUEST_HEADERS,
+    ).raise_for_status()
+    assert json.loads(views_file.read_text())["legacy_views_folder"] == (
+        f"{tmp_path}/ib/"
+    )
+
+
+def test_api_saved_views_put_requires_frontend_request(tmp_path: Path) -> None:
+    client, views_file = _saved_views_client(tmp_path)
+    resp = client.put(_views_url(str(tmp_path)), json={"views": [_view("x")]})
+    assert resp.status_code == 403
+    assert not views_file.exists()
+
+
+def test_api_saved_views_respects_the_log_dir(tmp_path: Path) -> None:
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    client, views_file = _saved_views_client(
+        tmp_path, fastapi_server.OnlyDirAccessPolicy(str(log_dir))
+    )
+    assert client.get(_views_url(f"{log_dir}/ib")).status_code == 200
+    assert client.get(_views_url(f"{tmp_path}/elsewhere")).status_code == 403
+    resp = client.put(
+        _views_url(f"{tmp_path}/elsewhere"),
+        json={"views": [_view("x")]},
+        headers=FRONTEND_REQUEST_HEADERS,
+    )
+    assert resp.status_code == 403
+    assert not views_file.exists()
+
+
+@pytest.mark.parametrize(
+    "views",
+    [[{"filter": ""}], [{"name": " "}], [_view("dup"), _view("dup")]],
+    ids=["no-name", "blank-name", "duplicate-names"],
+)
+def test_api_saved_views_rejects_invalid_views(
+    tmp_path: Path, views: list[dict[str, Any]]
+) -> None:
+    client, views_file = _saved_views_client(tmp_path)
+    resp = client.put(
+        _views_url(str(tmp_path)),
+        json={"views": views},
+        headers=FRONTEND_REQUEST_HEADERS,
+    )
+    assert resp.status_code == 400
+    assert not views_file.exists()
+
+
+def test_api_saved_views_moves_a_corrupt_file_aside(tmp_path: Path) -> None:
+    client, views_file = _saved_views_client(tmp_path)
+    views_file.parent.mkdir(parents=True)
+    views_file.write_text("{not json")
+    assert client.get(_views_url(str(tmp_path))).json()["views"] == []
+    assert not views_file.exists()
+    [aside] = views_file.parent.glob("saved_views.json.corrupt-*")
+    assert aside.read_text() == "{not json"
+
+
+def test_api_saved_views_absent_without_a_file(view_client: ViewTestClient) -> None:
+    resp = view_client.request("GET", _views_url(str(view_client.log_dir)))
+    assert resp.status_code == 404
+
+
 def test_api_log_dir(view_client: ViewTestClient) -> None:
     resp = view_client.request(
         "GET", f"/log-dir?log_dir={urllib.parse.quote_plus(str(view_client.log_dir))}"

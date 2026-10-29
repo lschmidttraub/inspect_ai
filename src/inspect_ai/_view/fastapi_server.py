@@ -84,6 +84,13 @@ from .network import (
     unsafe_network_warning,
 )
 from .notify import view_last_eval_time
+from .saved_views import (
+    SavedViews,
+    SavedViewsResponse,
+    default_saved_views_file,
+    read_saved_views,
+    write_saved_views,
+)
 from .scout_routes import get_scout_search_router
 from .user_info import UserInfo, user_info
 
@@ -163,6 +170,7 @@ def view_server_app(
     allow_direct_urls: bool = True,
     show_shards: bool = False,
     trust_content: bool | None = None,
+    saved_views_file: Path | None = None,
 ) -> "FastAPI":
     """Create the view server's JSON API.
 
@@ -180,6 +188,9 @@ def view_server_app(
         show_shards: List shard logs that a merged log already covers.
         trust_content: Reported in `/app-config`. False makes the viewer show
             every log's content as plain text; None defers to each log.
+        saved_views_file: Where `/saved-views` keeps the viewer's saved views.
+            None leaves the endpoints out (the viewer then keeps views in the
+            browser).
     """
     app = FastAPI()
 
@@ -713,6 +724,29 @@ def view_server_app(
     async def api_app_config() -> AppConfig:
         return get_app_config(trust_content)
 
+    if saved_views_file is not None:
+        views_file = saved_views_file
+
+        # File I/O stays on the event loop (a small local JSON file), which
+        # serializes each read-modify-write of the shared file.
+        @app.get("/saved-views")
+        async def api_saved_views(
+            request: Request, folder: str = Query(...)
+        ) -> SavedViewsResponse:
+            await _validate_list(request, normalize_uri(folder))
+            return read_saved_views(views_file, folder)
+
+        @app.put("/saved-views")
+        async def api_put_saved_views(
+            request: Request, saved: SavedViews, folder: str = Query(...)
+        ) -> SavedViewsResponse:
+            _validate_mutating_request(request)
+            await _validate_list(request, normalize_uri(folder))
+            try:
+                return write_saved_views(views_file, folder, saved.views)
+            except ValueError as ex:
+                raise HTTPException(status_code=400, detail=str(ex))
+
     scout_router = get_scout_search_router()
     if scout_router is not None:
         app.include_router(scout_router, prefix="/scout")
@@ -845,6 +879,7 @@ def standalone_view_app(
     dist_dir: Path | None = None,
     show_shards: bool = False,
     trust_content: bool | None = None,
+    saved_views_file: Path | None = None,
 ) -> ASGIApp:
     resolved_dist_dir = dist_dir or resolve_dist_directory()
     content_security_policy = read_content_security_policy(resolved_dist_dir)
@@ -872,6 +907,7 @@ def standalone_view_app(
         allow_direct_urls=allow_direct_urls,
         show_shards=show_shards,
         trust_content=trust_content,
+        saved_views_file=saved_views_file,
     )
 
     @api.get("/dist")
@@ -946,6 +982,7 @@ def view_server(
         generate_direct_urls=generate_direct_urls,
         show_shards=show_shards,
         trust_content=trust_content,
+        saved_views_file=default_saved_views_file(),
     )
 
     # one server-lifetime async filesystem (shared client + connection pool)

@@ -49542,6 +49542,8 @@ var isEvalFile = (file) => {
 		}) : void 0,
 		download_log_subset: api.download_log_subset ? middleware("download_log_subset", (log_file, samples, file_name) => api.download_log_subset(log_file, samples, file_name)) : void 0,
 		save_log_subset: api.save_log_subset ? middleware("save_log_subset", (log_file, samples, file_name) => api.save_log_subset(log_file, samples, file_name)) : void 0,
+		get_saved_views: api.get_saved_views ? middleware("get_saved_views", (folder) => api.get_saved_views(folder)) : void 0,
+		put_saved_views: api.put_saved_views ? middleware("put_saved_views", (folder, views) => api.put_saved_views(folder, views)) : void 0,
 		log_message: middleware("log_message", (log_file, message) => {
 			return api.log_message(log_file, message);
 		}),
@@ -50445,6 +50447,11 @@ async function fetchViewServerLogRoot(transport = {}, logDir) {
 			file_name
 		})).text()));
 	};
+	const savedViewsPath = (folder) => `/saved-views?folder=${encodeURIComponent(folder)}`;
+	const get_saved_views = async (folder) => (await requestApi.fetchString("GET", savedViewsPath(folder))).parsed;
+	const put_saved_views = async (folder, views) => {
+		await requestApi.fetchString("PUT", savedViewsPath(folder), {}, JSON.stringify({ views }));
+	};
 	const download_log = (log_file) => {
 		const url = `${apiBaseUrl || "/api"}/log-download/${encodeURIComponent(log_file)}`;
 		const link = document.createElement("a");
@@ -50474,6 +50481,8 @@ async function fetchViewServerLogRoot(transport = {}, logDir) {
 		edit_log,
 		download_log_subset,
 		save_log_subset,
+		get_saved_views,
+		put_saved_views,
 		get_user_info,
 		get_app_config,
 		list_searches,
@@ -131013,6 +131022,10 @@ var isSavedSampleView = (v) => isRecord(v) && typeof v.name === "string" && type
 		name: to.trim()
 	} : v);
 };
+/** `primary`'s views, then those in `secondary` whose names it lacks. */ var mergeSavedViews = (primary, secondary) => {
+	const names = new Set(primary.map((v) => v.name));
+	return [...primary, ...secondary.filter((v) => !names.has(v.name))];
+};
 /** Insert `view`, replacing any view with the same name in place. */ var upsertSavedView = (views, view) => {
 	const index = views.findIndex((v) => v.name === view.name);
 	if (index < 0) return [...views, view];
@@ -131032,87 +131045,271 @@ var idCondition = (ids) => ids.length === 1 ? `id == ${filterLiteral(ids[0])}` :
 };
 //#endregion
 //#region src/state/savedViews.ts
-var useSavedViews = create()(persist((set) => ({
-	views: [],
-	saveView: (view) => {
-		set((state) => ({ views: upsertSavedView(state.views, view) }));
-	},
-	deleteView: (name) => {
-		set((state) => ({ views: state.views.filter((v) => v.name !== name) }));
-	},
-	renameView: (from, to) => {
-		set((state) => ({ views: renameSavedView(state.views, from, to) }));
-	}
-}), {
+var server;
+var serverQueue = Promise.resolve();
+var enqueue = (task, onError) => {
+	serverQueue = serverQueue.then(task).catch(onError);
+};
+var viewsIn = (response) => parseSavedViews(isRecord(response) ? response.views : void 0);
+var stringIn = (response, key) => {
+	const value = isRecord(response) ? response[key] : void 0;
+	return typeof value === "string" ? value : void 0;
+};
+var setFolderViews = (folder, views) => {
+	useSavedViews.setState((state) => ({ viewsByFolder: {
+		...state.viewsByFolder,
+		[folder]: views
+	} }));
+};
+var writeToServer = (folder, op) => {
+	enqueue(async () => {
+		const target = server;
+		if (!target) return;
+		const next = op(viewsIn(await target.get(folder)));
+		await target.put(folder, next);
+		setFolderViews(folder, next);
+	}, (error) => console.error("Failed to save views to the view server", error));
+};
+var useSavedViews = create()(persist((set) => {
+	const apply = (folder, op) => {
+		set((state) => ({ viewsByFolder: {
+			...state.viewsByFolder,
+			[folder]: op(state.viewsByFolder[folder] ?? [])
+		} }));
+		writeToServer(folder, op);
+	};
+	return {
+		viewsByFolder: {},
+		syncedFolders: [],
+		legacyViews: [],
+		saveView: (folder, view) => {
+			apply(folder, (views) => upsertSavedView(views, view));
+		},
+		deleteView: (folder, name) => {
+			apply(folder, (views) => views.filter((v) => v.name !== name));
+		},
+		renameView: (folder, from, to) => {
+			apply(folder, (views) => renameSavedView(views, from, to));
+		}
+	};
+}, {
 	name: "inspect-saved-sample-views",
 	storage: createJSONStorage(() => localStorage),
-	version: 1,
-	merge: (persisted, current) => ({
-		...current,
-		views: parseSavedViews(isRecord(persisted) ? persisted.views : [])
-	})
+	version: 2,
+	migrate: (persisted, version) => version < 2 ? {
+		viewsByFolder: {},
+		syncedFolders: [],
+		legacyViews: isRecord(persisted) ? persisted.views : []
+	} : persisted,
+	partialize: (state) => ({
+		viewsByFolder: state.viewsByFolder,
+		syncedFolders: state.syncedFolders,
+		legacyViews: state.legacyViews
+	}),
+	merge: (persisted, current) => {
+		if (!isRecord(persisted)) return current;
+		const byFolder = isRecord(persisted.viewsByFolder) ? persisted.viewsByFolder : {};
+		return {
+			...current,
+			viewsByFolder: Object.fromEntries(Object.entries(byFolder).map(([folder, views]) => [folder, parseSavedViews(views)])),
+			syncedFolders: Array.isArray(persisted.syncedFolders) ? persisted.syncedFolders.filter((f) => typeof f === "string") : [],
+			legacyViews: parseSavedViews(persisted.legacyViews)
+		};
+	}
 }));
+/** File legacy views into `folder` locally (hosts without a server). */ var fileLegacyViewsLocally = (folder) => {
+	const { legacyViews, viewsByFolder } = useSavedViews.getState();
+	if (legacyViews.length === 0) return;
+	useSavedViews.setState({
+		legacyViews: [],
+		viewsByFolder: {
+			...viewsByFolder,
+			[folder]: mergeSavedViews(viewsByFolder[folder] ?? [], legacyViews)
+		}
+	});
+};
+/**
+* Load `folder`'s saved views, from the view server when there is one. The
+* first time this browser opens a folder, its local views for it are merged
+* into the server's; after that the server's list replaces the local one.
+* Legacy (pre-folder) views are filed on the way. If the server can't be
+* reached, views stay in this browser. Resolves when done; never rejects.
+*/ var openSavedViewsFolder = (folder, next) => {
+	if (!next) {
+		fileLegacyViewsLocally(folder);
+		return Promise.resolve(true);
+	}
+	server ??= next;
+	enqueue(async () => {
+		const target = server;
+		if (!target) {
+			fileLegacyViewsLocally(folder);
+			return;
+		}
+		const response = await target.get(folder);
+		let remote = viewsIn(response);
+		const { legacyViews } = useSavedViews.getState();
+		if (legacyViews.length > 0) {
+			const here = stringIn(response, "folder");
+			const destination = stringIn(response, "legacy_views_folder") ?? here;
+			if (destination === void 0 || destination === here) {
+				remote = mergeSavedViews(remote, legacyViews);
+				await target.put(folder, remote);
+			} else {
+				const there = viewsIn(await target.get(destination));
+				await target.put(destination, mergeSavedViews(there, legacyViews));
+			}
+			useSavedViews.setState({ legacyViews: [] });
+		}
+		const { viewsByFolder, syncedFolders } = useSavedViews.getState();
+		const synced = syncedFolders.includes(folder);
+		const views = synced ? remote : mergeSavedViews(remote, viewsByFolder[folder] ?? []);
+		if (views.length !== remote.length) await target.put(folder, views);
+		useSavedViews.setState({
+			viewsByFolder: {
+				...viewsByFolder,
+				[folder]: views
+			},
+			syncedFolders: synced ? syncedFolders : [...syncedFolders, folder],
+			serverPath: stringIn(response, "path")
+		});
+	}, (error) => {
+		server = void 0;
+		fileLegacyViewsLocally(folder);
+		console.warn("The view server's saved views are unavailable; keeping views in this browser only.", error);
+	});
+	return serverQueue.then(() => true);
+};
 //#endregion
 //#region src/app/samples/list/useSavedSampleViews.ts
+var kNoViews = [];
 function useSavedSampleViews() {
-	const $ = (0, import_compiler_runtime.c)(28);
+	const $ = (0, import_compiler_runtime.c)(57);
 	const { view, patchView } = useSamplesView();
 	const filter = useStore(_temp$25);
 	const setFilter = useStore(_temp2$21);
 	const setSelectedScores = useStore(_temp3$14);
 	const selectedScores = useSelectedScores();
 	const availableScores = useScores();
-	const views = useSavedViews(_temp4$14);
-	const saveView = useSavedViews(_temp5$7);
-	const deleteView = useSavedViews(_temp6$5);
-	const renameView = useSavedViews(_temp7$4);
-	let snapshot;
+	const logFile = useCurrentLogFile();
 	let t0;
+	if ($[0] !== logFile) {
+		t0 = logFile ? dirname(logFile) : "";
+		$[0] = logFile;
+		$[1] = t0;
+	} else t0 = $[1];
+	const folder = t0;
 	let t1;
-	if ($[0] !== filter || $[1] !== selectedScores || $[2] !== view || $[3] !== views) {
+	if ($[2] !== folder) {
+		t1 = (state_2) => state_2.viewsByFolder[folder] ?? kNoViews;
+		$[2] = folder;
+		$[3] = t1;
+	} else t1 = $[3];
+	const views = useSavedViews(t1);
+	const saveView = useSavedViews(_temp4$14);
+	const deleteView = useSavedViews(_temp5$7);
+	const renameView = useSavedViews(_temp6$5);
+	const serverPath = useSavedViews(_temp7$4);
+	const { api } = useAppConfig();
+	const getViews = api.get_saved_views;
+	const putViews = api.put_saved_views;
+	let t2;
+	if ($[4] !== getViews || $[5] !== putViews) {
+		t2 = getViews && putViews ? {
+			get: getViews,
+			put: putViews
+		} : void 0;
+		$[4] = getViews;
+		$[5] = putViews;
+		$[6] = t2;
+	} else t2 = $[6];
+	const server = t2;
+	let t3;
+	if ($[7] !== folder) {
+		t3 = ["saved-views-folder", folder];
+		$[7] = folder;
+		$[8] = t3;
+	} else t3 = $[8];
+	let t4;
+	if ($[9] !== folder || $[10] !== server) {
+		t4 = () => openSavedViewsFolder(folder, server);
+		$[9] = folder;
+		$[10] = server;
+		$[11] = t4;
+	} else t4 = $[11];
+	let t5;
+	if ($[12] !== t3 || $[13] !== t4) {
+		t5 = {
+			queryKey: t3,
+			queryFn: t4,
+			staleTime: Infinity,
+			gcTime: Infinity,
+			retry: false
+		};
+		$[12] = t3;
+		$[13] = t4;
+		$[14] = t5;
+	} else t5 = $[14];
+	useAsyncDataFromQuery(t5);
+	let snapshot;
+	let t6;
+	let t7;
+	let t8;
+	let t9;
+	if ($[15] !== filter || $[16] !== folder || $[17] !== selectedScores || $[18] !== serverPath || $[19] !== view || $[20] !== views) {
 		snapshot = {
 			filter,
 			view,
 			selectedScores
 		};
-		t0 = views;
-		t1 = views.find((v) => isSavedViewActive(v, snapshot));
-		$[0] = filter;
-		$[1] = selectedScores;
-		$[2] = view;
-		$[3] = views;
-		$[4] = snapshot;
-		$[5] = t0;
-		$[6] = t1;
+		t6 = views;
+		t7 = folder;
+		t8 = serverPath;
+		t9 = views.find((v) => isSavedViewActive(v, snapshot));
+		$[15] = filter;
+		$[16] = folder;
+		$[17] = selectedScores;
+		$[18] = serverPath;
+		$[19] = view;
+		$[20] = views;
+		$[21] = snapshot;
+		$[22] = t6;
+		$[23] = t7;
+		$[24] = t8;
+		$[25] = t9;
 	} else {
-		snapshot = $[4];
-		t0 = $[5];
-		t1 = $[6];
+		snapshot = $[21];
+		t6 = $[22];
+		t7 = $[23];
+		t8 = $[24];
+		t9 = $[25];
 	}
-	let t2;
-	if ($[7] !== saveView || $[8] !== snapshot) {
-		t2 = (name) => saveView(captureSavedView(name, snapshot));
-		$[7] = saveView;
-		$[8] = snapshot;
-		$[9] = t2;
-	} else t2 = $[9];
-	let t3;
-	if ($[10] !== saveView || $[11] !== setFilter || $[12] !== snapshot) {
-		t3 = (name_0, nextFilter) => {
-			saveView(captureSavedView(name_0, {
+	let t10;
+	if ($[26] !== folder || $[27] !== saveView || $[28] !== snapshot) {
+		t10 = (name) => saveView(folder, captureSavedView(name, snapshot));
+		$[26] = folder;
+		$[27] = saveView;
+		$[28] = snapshot;
+		$[29] = t10;
+	} else t10 = $[29];
+	let t11;
+	if ($[30] !== folder || $[31] !== saveView || $[32] !== setFilter || $[33] !== snapshot) {
+		t11 = (name_0, nextFilter) => {
+			saveView(folder, captureSavedView(name_0, {
 				...snapshot,
 				filter: nextFilter
 			}));
 			setFilter(nextFilter);
 		};
-		$[10] = saveView;
-		$[11] = setFilter;
-		$[12] = snapshot;
-		$[13] = t3;
-	} else t3 = $[13];
-	let t4;
-	if ($[14] !== availableScores || $[15] !== patchView || $[16] !== setFilter || $[17] !== setSelectedScores || $[18] !== view) {
-		t4 = (saved) => {
+		$[30] = folder;
+		$[31] = saveView;
+		$[32] = setFilter;
+		$[33] = snapshot;
+		$[34] = t11;
+	} else t11 = $[34];
+	let t12;
+	if ($[35] !== availableScores || $[36] !== patchView || $[37] !== setFilter || $[38] !== setSelectedScores || $[39] !== view) {
+		t12 = (saved) => {
 			const applied = applySavedView(saved, {
 				view,
 				availableScores
@@ -131121,46 +131318,64 @@ function useSavedSampleViews() {
 			setFilter(applied.filter);
 			if (applied.selectedScores) setSelectedScores(applied.selectedScores);
 		};
-		$[14] = availableScores;
-		$[15] = patchView;
-		$[16] = setFilter;
-		$[17] = setSelectedScores;
-		$[18] = view;
-		$[19] = t4;
-	} else t4 = $[19];
-	let t5;
-	if ($[20] !== deleteView || $[21] !== renameView || $[22] !== t0 || $[23] !== t1 || $[24] !== t2 || $[25] !== t3 || $[26] !== t4) {
-		t5 = {
-			views: t0,
-			activeView: t1,
-			saveCurrent: t2,
-			saveWithFilter: t3,
-			apply: t4,
-			remove: deleteView,
-			rename: renameView
+		$[35] = availableScores;
+		$[36] = patchView;
+		$[37] = setFilter;
+		$[38] = setSelectedScores;
+		$[39] = view;
+		$[40] = t12;
+	} else t12 = $[40];
+	let t13;
+	if ($[41] !== deleteView || $[42] !== folder) {
+		t13 = (name_1) => deleteView(folder, name_1);
+		$[41] = deleteView;
+		$[42] = folder;
+		$[43] = t13;
+	} else t13 = $[43];
+	let t14;
+	if ($[44] !== folder || $[45] !== renameView) {
+		t14 = (from, to) => renameView(folder, from, to);
+		$[44] = folder;
+		$[45] = renameView;
+		$[46] = t14;
+	} else t14 = $[46];
+	let t15;
+	if ($[47] !== t10 || $[48] !== t11 || $[49] !== t12 || $[50] !== t13 || $[51] !== t14 || $[52] !== t6 || $[53] !== t7 || $[54] !== t8 || $[55] !== t9) {
+		t15 = {
+			views: t6,
+			folder: t7,
+			serverPath: t8,
+			activeView: t9,
+			saveCurrent: t10,
+			saveWithFilter: t11,
+			apply: t12,
+			remove: t13,
+			rename: t14
 		};
-		$[20] = deleteView;
-		$[21] = renameView;
-		$[22] = t0;
-		$[23] = t1;
-		$[24] = t2;
-		$[25] = t3;
-		$[26] = t4;
-		$[27] = t5;
-	} else t5 = $[27];
-	return t5;
+		$[47] = t10;
+		$[48] = t11;
+		$[49] = t12;
+		$[50] = t13;
+		$[51] = t14;
+		$[52] = t6;
+		$[53] = t7;
+		$[54] = t8;
+		$[55] = t9;
+		$[56] = t15;
+	} else t15 = $[56];
+	return t15;
 }
-function _temp7$4(state_5) {
+function _temp7$4(state_6) {
+	return state_6.serverPath;
+}
+function _temp6$5(state_5) {
 	return state_5.renameView;
 }
-function _temp6$5(state_4) {
+function _temp5$7(state_4) {
 	return state_4.deleteView;
 }
-function _temp5$7(state_3) {
+function _temp4$14(state_3) {
 	return state_3.saveView;
-}
-function _temp4$14(state_2) {
-	return state_2.views;
 }
 function _temp3$14(state_1) {
 	return state_1.logActions.setSelectedScores;
@@ -149531,25 +149746,26 @@ var numberLiteral = (n) => String(n);
 	return parts.join(" and ");
 }
 var SamplesViewOptionsPopover_module_default = {
-	container: "_container_17wwi_1",
-	row: "_row_17wwi_9",
-	checkbox: "_checkbox_17wwi_16",
-	heading: "_heading_17wwi_21",
-	divider: "_divider_17wwi_28",
-	empty: "_empty_17wwi_33",
-	viewList: "_viewList_17wwi_38",
-	viewRow: "_viewRow_17wwi_49",
-	activeView: "_activeView_17wwi_60",
-	viewApply: "_viewApply_17wwi_64",
-	check: "_check_17wwi_16",
-	hidden: "_hidden_17wwi_83",
-	viewName: "_viewName_17wwi_87",
-	viewFilter: "_viewFilter_17wwi_94",
-	iconButton: "_iconButton_17wwi_104",
-	saveForm: "_saveForm_17wwi_121",
-	nameInput: "_nameInput_17wwi_126",
-	saveButton: "_saveButton_17wwi_133",
-	renameForm: "_renameForm_17wwi_138"
+	container: "_container_qizdw_1",
+	row: "_row_qizdw_9",
+	checkbox: "_checkbox_qizdw_16",
+	heading: "_heading_qizdw_21",
+	divider: "_divider_qizdw_28",
+	empty: "_empty_qizdw_33",
+	viewList: "_viewList_qizdw_38",
+	viewRow: "_viewRow_qizdw_49",
+	activeView: "_activeView_qizdw_60",
+	viewApply: "_viewApply_qizdw_64",
+	check: "_check_qizdw_16",
+	hidden: "_hidden_qizdw_83",
+	viewName: "_viewName_qizdw_87",
+	viewFilter: "_viewFilter_qizdw_94",
+	iconButton: "_iconButton_qizdw_104",
+	saveForm: "_saveForm_qizdw_121",
+	nameInput: "_nameInput_qizdw_126",
+	saveButton: "_saveButton_qizdw_133",
+	renameForm: "_renameForm_qizdw_138",
+	headingFolder: "_headingFolder_qizdw_151"
 };
 //#endregion
 //#region src/app/samples/list/SamplesViewOptionsPopover.tsx
@@ -149559,7 +149775,7 @@ var focusAndSelect = (el) => {
 	el.select();
 };
 var SamplesViewOptionsPopover = (t0) => {
-	const $ = (0, import_compiler_runtime.c)(71);
+	const $ = (0, import_compiler_runtime.c)(76);
 	const { showing, setShowing, positionEl } = t0;
 	const { view, setMultiline, setCompactScores, setColorScalesEnabled } = useSamplesView();
 	const scoreColorScales = useSamplesViewScoreColorScales();
@@ -149629,27 +149845,45 @@ var SamplesViewOptionsPopover = (t0) => {
 	const handleSave = t6;
 	let t7;
 	let t8;
-	let t9;
 	if ($[15] === Symbol.for("react.memo_cache_sentinel")) {
 		t7 = [0, 1];
 		t8 = clsx(SamplesViewOptionsPopover_module_default.container, "text-size-small");
-		t9 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", {
-			className: SamplesViewOptionsPopover_module_default.heading,
-			children: "Saved views"
-		});
 		$[15] = t7;
 		$[16] = t8;
-		$[17] = t9;
 	} else {
 		t7 = $[15];
 		t8 = $[16];
-		t9 = $[17];
 	}
+	const t9 = `Views for ${savedViews.folder || "this folder"}, ${savedViews.serverPath ? `kept by the view server in ${savedViews.serverPath}` : "kept in this browser"}`;
 	let t10;
-	if ($[18] !== handleRename || $[19] !== renameValid || $[20] !== renaming || $[21] !== savedViews) {
-		t10 = savedViews.views.length === 0 ? /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", {
+	if ($[17] !== savedViews.folder) {
+		t10 = savedViews.folder && /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("span", {
+			className: SamplesViewOptionsPopover_module_default.headingFolder,
+			children: [
+				" ",
+				"· ",
+				basename(savedViews.folder)
+			]
+		});
+		$[17] = savedViews.folder;
+		$[18] = t10;
+	} else t10 = $[18];
+	let t11;
+	if ($[19] !== t10 || $[20] !== t9) {
+		t11 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("div", {
+			className: SamplesViewOptionsPopover_module_default.heading,
+			title: t9,
+			children: ["Saved views", t10]
+		});
+		$[19] = t10;
+		$[20] = t9;
+		$[21] = t11;
+	} else t11 = $[21];
+	let t12;
+	if ($[22] !== handleRename || $[23] !== renameValid || $[24] !== renaming || $[25] !== savedViews) {
+		t12 = savedViews.views.length === 0 ? /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", {
 			className: SamplesViewOptionsPopover_module_default.empty,
-			children: "Save the current filter, columns, sort and layout to reuse them on any log."
+			children: "Save the current filter, columns, sort and layout to reuse them on any log in this folder."
 		}) : /*#__PURE__*/ (0, import_jsx_runtime.jsx)("ul", {
 			className: SamplesViewOptionsPopover_module_default.viewList,
 			"aria-label": "Saved views",
@@ -149750,152 +149984,152 @@ var SamplesViewOptionsPopover = (t0) => {
 				}, saved.name);
 			})
 		});
-		$[18] = handleRename;
-		$[19] = renameValid;
-		$[20] = renaming;
-		$[21] = savedViews;
-		$[22] = t10;
-	} else t10 = $[22];
-	let t11;
-	if ($[23] === Symbol.for("react.memo_cache_sentinel")) {
-		t11 = clsx("form-control", SamplesViewOptionsPopover_module_default.nameInput);
-		$[23] = t11;
-	} else t11 = $[23];
-	let t12;
-	if ($[24] === Symbol.for("react.memo_cache_sentinel")) {
-		t12 = (e_3) => setNewViewName(e_3.target.value);
-		$[24] = t12;
-	} else t12 = $[24];
+		$[22] = handleRename;
+		$[23] = renameValid;
+		$[24] = renaming;
+		$[25] = savedViews;
+		$[26] = t12;
+	} else t12 = $[26];
 	let t13;
-	if ($[25] !== newViewName) {
-		t13 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
+	if ($[27] === Symbol.for("react.memo_cache_sentinel")) {
+		t13 = clsx("form-control", SamplesViewOptionsPopover_module_default.nameInput);
+		$[27] = t13;
+	} else t13 = $[27];
+	let t14;
+	if ($[28] === Symbol.for("react.memo_cache_sentinel")) {
+		t14 = (e_3) => setNewViewName(e_3.target.value);
+		$[28] = t14;
+	} else t14 = $[28];
+	let t15;
+	if ($[29] !== newViewName) {
+		t15 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
 			type: "text",
-			className: t11,
+			className: t13,
 			placeholder: "New view name",
 			"aria-label": "New view name",
 			value: newViewName,
-			onChange: t12
+			onChange: t14
 		});
-		$[25] = newViewName;
-		$[26] = t13;
-	} else t13 = $[26];
-	let t14;
-	if ($[27] === Symbol.for("react.memo_cache_sentinel")) {
-		t14 = clsx("btn", "btn-primary", SamplesViewOptionsPopover_module_default.saveButton);
-		$[27] = t14;
-	} else t14 = $[27];
-	const t15 = !trimmedName;
-	const t16 = replacing ? `Replace "${trimmedName}" with the current view` : "Save the current view";
-	const t17 = replacing ? "Replace" : "Save";
-	let t18;
-	if ($[28] !== t15 || $[29] !== t16 || $[30] !== t17) {
-		t18 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("button", {
+		$[29] = newViewName;
+		$[30] = t15;
+	} else t15 = $[30];
+	let t16;
+	if ($[31] === Symbol.for("react.memo_cache_sentinel")) {
+		t16 = clsx("btn", "btn-primary", SamplesViewOptionsPopover_module_default.saveButton);
+		$[31] = t16;
+	} else t16 = $[31];
+	const t17 = !trimmedName;
+	const t18 = replacing ? `Replace "${trimmedName}" with the current view` : "Save the current view";
+	const t19 = replacing ? "Replace" : "Save";
+	let t20;
+	if ($[32] !== t17 || $[33] !== t18 || $[34] !== t19) {
+		t20 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("button", {
 			type: "submit",
-			className: t14,
-			disabled: t15,
-			title: t16,
-			children: t17
+			className: t16,
+			disabled: t17,
+			title: t18,
+			children: t19
 		});
-		$[28] = t15;
-		$[29] = t16;
-		$[30] = t17;
-		$[31] = t18;
-	} else t18 = $[31];
-	let t19;
-	if ($[32] !== handleSave || $[33] !== t13 || $[34] !== t18) {
-		t19 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("form", {
+		$[32] = t17;
+		$[33] = t18;
+		$[34] = t19;
+		$[35] = t20;
+	} else t20 = $[35];
+	let t21;
+	if ($[36] !== handleSave || $[37] !== t15 || $[38] !== t20) {
+		t21 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("form", {
 			className: SamplesViewOptionsPopover_module_default.saveForm,
 			onSubmit: handleSave,
-			children: [t13, t18]
+			children: [t15, t20]
 		});
-		$[32] = handleSave;
-		$[33] = t13;
-		$[34] = t18;
-		$[35] = t19;
-	} else t19 = $[35];
-	let t20;
-	let t21;
-	if ($[36] === Symbol.for("react.memo_cache_sentinel")) {
-		t20 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", { className: SamplesViewOptionsPopover_module_default.divider });
-		t21 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", {
+		$[36] = handleSave;
+		$[37] = t15;
+		$[38] = t20;
+		$[39] = t21;
+	} else t21 = $[39];
+	let t22;
+	let t23;
+	if ($[40] === Symbol.for("react.memo_cache_sentinel")) {
+		t22 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", { className: SamplesViewOptionsPopover_module_default.divider });
+		t23 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", {
 			className: SamplesViewOptionsPopover_module_default.heading,
 			children: "Display"
 		});
-		$[36] = t20;
-		$[37] = t21;
-	} else {
-		t20 = $[36];
-		t21 = $[37];
-	}
-	let t22;
-	if ($[38] !== setMultiline || $[39] !== view.multiline) {
-		t22 = () => setMultiline(!view.multiline);
-		$[38] = setMultiline;
-		$[39] = view.multiline;
 		$[40] = t22;
-	} else t22 = $[40];
-	let t23;
-	if ($[41] !== t22 || $[42] !== view.multiline) {
-		t23 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
-			type: "checkbox",
-			checked: view.multiline,
-			onChange: t22,
-			className: SamplesViewOptionsPopover_module_default.checkbox
-		});
-		$[41] = t22;
-		$[42] = view.multiline;
-		$[43] = t23;
-	} else t23 = $[43];
+		$[41] = t23;
+	} else {
+		t22 = $[40];
+		t23 = $[41];
+	}
 	let t24;
-	if ($[44] === Symbol.for("react.memo_cache_sentinel")) {
-		t24 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("span", { children: "Multiline" });
+	if ($[42] !== setMultiline || $[43] !== view.multiline) {
+		t24 = () => setMultiline(!view.multiline);
+		$[42] = setMultiline;
+		$[43] = view.multiline;
 		$[44] = t24;
 	} else t24 = $[44];
 	let t25;
-	if ($[45] !== t23) {
-		t25 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("label", {
-			className: SamplesViewOptionsPopover_module_default.row,
-			children: [t23, t24]
-		});
-		$[45] = t23;
-		$[46] = t25;
-	} else t25 = $[46];
-	let t26;
-	if ($[47] !== setCompactScores || $[48] !== view.compactScores) {
-		t26 = () => setCompactScores(!view.compactScores);
-		$[47] = setCompactScores;
-		$[48] = view.compactScores;
-		$[49] = t26;
-	} else t26 = $[49];
-	let t27;
-	if ($[50] !== t26 || $[51] !== view.compactScores) {
-		t27 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
+	if ($[45] !== t24 || $[46] !== view.multiline) {
+		t25 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
 			type: "checkbox",
-			checked: view.compactScores,
-			onChange: t26,
+			checked: view.multiline,
+			onChange: t24,
 			className: SamplesViewOptionsPopover_module_default.checkbox
 		});
-		$[50] = t26;
-		$[51] = view.compactScores;
-		$[52] = t27;
-	} else t27 = $[52];
+		$[45] = t24;
+		$[46] = view.multiline;
+		$[47] = t25;
+	} else t25 = $[47];
+	let t26;
+	if ($[48] === Symbol.for("react.memo_cache_sentinel")) {
+		t26 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("span", { children: "Multiline" });
+		$[48] = t26;
+	} else t26 = $[48];
+	let t27;
+	if ($[49] !== t25) {
+		t27 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("label", {
+			className: SamplesViewOptionsPopover_module_default.row,
+			children: [t25, t26]
+		});
+		$[49] = t25;
+		$[50] = t27;
+	} else t27 = $[50];
 	let t28;
-	if ($[53] === Symbol.for("react.memo_cache_sentinel")) {
-		t28 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("span", { children: "Compact scores" });
+	if ($[51] !== setCompactScores || $[52] !== view.compactScores) {
+		t28 = () => setCompactScores(!view.compactScores);
+		$[51] = setCompactScores;
+		$[52] = view.compactScores;
 		$[53] = t28;
 	} else t28 = $[53];
 	let t29;
-	if ($[54] !== t27) {
-		t29 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("label", {
-			className: SamplesViewOptionsPopover_module_default.row,
-			children: [t27, t28]
+	if ($[54] !== t28 || $[55] !== view.compactScores) {
+		t29 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
+			type: "checkbox",
+			checked: view.compactScores,
+			onChange: t28,
+			className: SamplesViewOptionsPopover_module_default.checkbox
 		});
-		$[54] = t27;
-		$[55] = t29;
-	} else t29 = $[55];
+		$[54] = t28;
+		$[55] = view.compactScores;
+		$[56] = t29;
+	} else t29 = $[56];
 	let t30;
-	if ($[56] !== setColorScalesEnabled || $[57] !== showColorScales || $[58] !== view.colorScalesEnabled) {
-		t30 = showColorScales && /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("label", {
+	if ($[57] === Symbol.for("react.memo_cache_sentinel")) {
+		t30 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)("span", { children: "Compact scores" });
+		$[57] = t30;
+	} else t30 = $[57];
+	let t31;
+	if ($[58] !== t29) {
+		t31 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("label", {
+			className: SamplesViewOptionsPopover_module_default.row,
+			children: [t29, t30]
+		});
+		$[58] = t29;
+		$[59] = t31;
+	} else t31 = $[59];
+	let t32;
+	if ($[60] !== setColorScalesEnabled || $[61] !== showColorScales || $[62] !== view.colorScalesEnabled) {
+		t32 = showColorScales && /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("label", {
 			className: SamplesViewOptionsPopover_module_default.row,
 			children: [/*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
 				type: "checkbox",
@@ -149904,36 +150138,37 @@ var SamplesViewOptionsPopover = (t0) => {
 				className: SamplesViewOptionsPopover_module_default.checkbox
 			}), /*#__PURE__*/ (0, import_jsx_runtime.jsx)("span", { children: "Score colors" })]
 		});
-		$[56] = setColorScalesEnabled;
-		$[57] = showColorScales;
-		$[58] = view.colorScalesEnabled;
-		$[59] = t30;
-	} else t30 = $[59];
-	let t31;
-	if ($[60] !== t10 || $[61] !== t19 || $[62] !== t25 || $[63] !== t29 || $[64] !== t30) {
-		t31 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("div", {
+		$[60] = setColorScalesEnabled;
+		$[61] = showColorScales;
+		$[62] = view.colorScalesEnabled;
+		$[63] = t32;
+	} else t32 = $[63];
+	let t33;
+	if ($[64] !== t11 || $[65] !== t12 || $[66] !== t21 || $[67] !== t27 || $[68] !== t31 || $[69] !== t32) {
+		t33 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("div", {
 			className: t8,
 			children: [
-				t9,
-				t10,
-				t19,
-				t20,
+				t11,
+				t12,
 				t21,
-				t25,
-				t29,
-				t30
+				t22,
+				t23,
+				t27,
+				t31,
+				t32
 			]
 		});
-		$[60] = t10;
-		$[61] = t19;
-		$[62] = t25;
-		$[63] = t29;
-		$[64] = t30;
-		$[65] = t31;
-	} else t31 = $[65];
-	let t32;
-	if ($[66] !== positionEl || $[67] !== setShowing || $[68] !== showing || $[69] !== t31) {
-		t32 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)(PopOver, {
+		$[64] = t11;
+		$[65] = t12;
+		$[66] = t21;
+		$[67] = t27;
+		$[68] = t31;
+		$[69] = t32;
+		$[70] = t33;
+	} else t33 = $[70];
+	let t34;
+	if ($[71] !== positionEl || $[72] !== setShowing || $[73] !== showing || $[74] !== t33) {
+		t34 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)(PopOver, {
 			id: "samples-view-options-popover",
 			isOpen: showing,
 			setIsOpen: setShowing,
@@ -149943,15 +150178,15 @@ var SamplesViewOptionsPopover = (t0) => {
 			hoverDelay: -1,
 			closeOnMouseLeave: false,
 			offset: t7,
-			children: t31
+			children: t33
 		});
-		$[66] = positionEl;
-		$[67] = setShowing;
-		$[68] = showing;
-		$[69] = t31;
-		$[70] = t32;
-	} else t32 = $[70];
-	return t32;
+		$[71] = positionEl;
+		$[72] = setShowing;
+		$[73] = showing;
+		$[74] = t33;
+		$[75] = t34;
+	} else t34 = $[75];
+	return t34;
 };
 //#endregion
 //#region ../../node_modules/.pnpm/@codemirror+autocomplete@6.20.4/node_modules/@codemirror/autocomplete/dist/index.js
