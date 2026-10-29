@@ -57,6 +57,7 @@ from .common import (
     LogSubsetRequest,
     LogSubsetSaveRequest,
     LogSubsetSaveResponse,
+    LogToken,
     apply_log_edits,
     build_pending_sample_urls,
     delete_log,
@@ -466,18 +467,21 @@ def view_server_app(
         await _validate_list(request, log_dir)
 
         client_etag = request.headers.get("If-None-Match")
-        mtime = 0.0
-        file_count = 0
-        if client_etag is not None:
-            mtime, file_count = parse_log_token(client_etag)
+        token = (
+            parse_log_token(client_etag)
+            if client_etag is not None
+            else LogToken(mtime=0.0, file_count=0, names_digest=None)
+        )
         result = await get_log_files(
             await _map_file(request, log_dir),
             recursive=recursive,
             fs_options=fs_options,
-            mtime=mtime,
-            file_count=file_count,
+            mtime=token.mtime,
+            file_count=token.file_count,
             show_shards=show_shards,
             can_read=_read_checker(request),
+            names_digest=token.names_digest,
+            client_name=partial(_unmap_file, request),
         )
         for entry in result.files:
             entry.name = await _unmap_file(request, entry.name)

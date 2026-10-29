@@ -1227,6 +1227,55 @@ def test_api_log_files_incremental(view_client: ViewTestClient) -> None:
     assert resp2.json()["response_type"] == "incremental"
 
 
+def test_log_names_digest_is_order_independent_and_matches_the_viewer() -> None:
+    names = ["file:///logs/a.eval", "file:///logs/sub/ü b.eval"]
+    # the viewer's logNamesDigest test pins the same value
+    assert inspect_ai._view.common.log_names_digest(names) == "2c148067"
+    assert inspect_ai._view.common.log_names_digest(reversed(names)) == "2c148067"
+    assert inspect_ai._view.common.log_names_digest([]) == "00000000"
+
+
+def test_api_log_files_sends_a_full_listing_when_logs_move(
+    view_client: ViewTestClient,
+) -> None:
+    write_eval_log_named(view_client.log_dir, "a.eval", "t1", "id1")
+    write_eval_log_named(view_client.log_dir, "b.eval", "t2", "id2")
+    url = f"/log-files?log_dir={urllib.parse.quote_plus(str(view_client.log_dir))}"
+    before = view_client.request("GET", url).json()["files"]
+    mtime = max(f["mtime"] for f in before)
+    digest = inspect_ai._view.common.log_names_digest(f["name"] for f in before)
+
+    # moving a log keeps the file count and its mtime
+    (view_client.log_dir / "sub").mkdir()
+    os.rename(view_client.log_dir / "b.eval", view_client.log_dir / "sub" / "b.eval")
+
+    # the count/mtime token alone can't see the move
+    old = view_client.request(
+        "GET", url, headers={"If-None-Match": f'W/"{mtime}-2"'}
+    ).json()
+    assert old == {"response_type": "incremental", "files": []}
+
+    # with the names digest it gets the new layout
+    moved = view_client.request(
+        "GET", url, headers={"If-None-Match": f'W/"{mtime}-2-{digest}"'}
+    ).json()
+    assert moved["response_type"] == "full"
+    assert sorted(f["name"].rsplit("/", 1)[-1] for f in moved["files"]) == [
+        "a.eval",
+        "b.eval",
+    ]
+    assert any(f["name"].endswith("/sub/b.eval") for f in moved["files"])
+
+    # and once it has those names, polling is incremental again
+    current = inspect_ai._view.common.log_names_digest(
+        f["name"] for f in moved["files"]
+    )
+    again = view_client.request(
+        "GET", url, headers={"If-None-Match": f'W/"{mtime}-2-{current}"'}
+    ).json()
+    assert again == {"response_type": "incremental", "files": []}
+
+
 def test_api_log_files_count_change_gives_full(view_client: ViewTestClient) -> None:
     write_eval_log_named(
         view_client.log_dir, "2025-01-01T00-00-00+00-00_t1_id1.eval", "t1", "id1"

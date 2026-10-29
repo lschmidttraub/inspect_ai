@@ -49515,7 +49515,7 @@ var isEvalFile = (file) => {
 		client_events: middleware("client_events", () => {
 			return api.client_events();
 		}),
-		get_logs: middleware("get_log_files", (mtime, clientFileCount) => api.get_logs(mtime, clientFileCount)),
+		get_logs: middleware("get_log_files", (mtime, clientFileCount, clientNames) => api.get_logs(mtime, clientFileCount, clientNames)),
 		get_eval_set: middleware("get_eval_set", (dir) => {
 			return api.get_eval_set(dir);
 		}),
@@ -50007,6 +50007,19 @@ var kFallbackAppConfig = {
 	};
 }
 //#endregion
+//#region src/client/api/shared/logNamesDigest.ts
+/**
+* Order-independent fingerprint of a listing's file names: the sum (mod
+* 2^32) of each name's CRC-32 over UTF-8, as 8 hex digits. The view server
+* computes the same (`log_names_digest` in `_view/common.py`); keep the two
+* in sync.
+*/ var logNamesDigest = (names) => {
+	const encoder = new TextEncoder();
+	let total = 0;
+	for (const name of names) total = total + crc32(encoder.encode(name)) >>> 0;
+	return total.toString(16).padStart(8, "0");
+};
+//#endregion
 //#region src/client/api/view-server/request.ts
 var VIEW_REQUEST_HEADER = "X-Inspect-View-Request";
 var VIEW_REQUEST_HEADER_VALUE = "true";
@@ -50194,16 +50207,16 @@ async function fetchViewServerLogRoot(transport = {}, logDir) {
 		params.append("last_eval_time", String(lastEvalTime.valueOf()));
 		return asResponse((await requestApi.fetchString("GET", `/events?${params.toString()}`)).parsed);
 	};
-	const get_logs = async (mtime, clientFileCount) => {
+	const get_logs = async (mtime, clientFileCount, clientNames) => {
 		const path = `/log-files?log_dir=${encodeURIComponent(logDir)}`;
 		const headers = {};
-		const token = log_file_token(mtime, clientFileCount);
+		const token = log_file_token(mtime, clientFileCount, clientNames);
 		if (token) headers["If-None-Match"] = token;
 		lastEvalTime = Date.now();
 		return asResponse((await requestApi.fetchString("GET", path, headers)).parsed);
 	};
-	const log_file_token = (mtime, fileCount) => {
-		return `W/"${mtime}-${fileCount}"`;
+	const log_file_token = (mtime, fileCount, names) => {
+		return `W/"${mtime}-${fileCount}${names ? `-${logNamesDigest(names)}` : ""}"`;
 	};
 	const get_eval_set = async (dir) => {
 		const basePath = "/eval-set";
@@ -58141,7 +58154,7 @@ var opening = null;
 			epoch
 		});
 	}
-	const response = await api.get_logs(mtime, localFiles.length);
+	const response = await api.get_logs(mtime, localFiles.length, localFiles.map((file) => file.name));
 	const updatedLogs = response.files;
 	const localFilesByName = new Map(localFiles.map((file) => [file.name, file]));
 	const updatedNames = new Set(updatedLogs.map((file) => file.name));

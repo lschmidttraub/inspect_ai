@@ -2,12 +2,13 @@ import asyncio
 import os
 import tempfile
 import urllib.parse
+import zlib
 from collections.abc import AsyncIterable, Awaitable, Callable
 from functools import partial
 from importlib.metadata import PackageNotFoundError, version
 from io import BytesIO
 from logging import getLogger
-from typing import Any, Literal, NamedTuple, Tuple, cast
+from typing import Any, Iterable, Literal, NamedTuple, cast
 
 import anyio
 import fsspec  # type: ignore
@@ -247,7 +248,18 @@ async def get_log_files(
     file_count: int,
     show_shards: bool = False,
     can_read: Callable[[str], Awaitable[bool]] | None = None,
+    names_digest: str | None = None,
+    client_name: Callable[[str], Awaitable[str]] | None = None,
 ) -> LogFilesResponse:
+    """List a log dir, sending only what changed since the client's token.
+
+    The client's token is the newest mtime and the file count of its listing,
+    and optionally `names_digest` (`log_names_digest` of its file names): with
+    it, a listing whose names changed while the count and mtimes didn't (logs
+    moved or renamed, which keeps their mtimes) is sent in full. Without it,
+    such a client keeps the old names. `client_name` maps a listed name to the
+    name the client sees, for comparing digests.
+    """
     # list logs
     logs = await list_eval_logs_async(
         log_dir=request_log_dir, recursive=recursive, fs_options=fs_options
@@ -271,15 +283,32 @@ async def get_log_files(
         return log_files_response(
             logs, response_type="full", base_log_dir=request_log_dir
         )
-    else:
-        # send only the changed files (captures edits)
-        logs = [log for log in logs if (log.mtime is None or log.mtime > mtime)]
-        return log_files_response(
-            logs, response_type="incremental", base_log_dir=request_log_dir
+    elif names_digest is not None:
+        full = log_files_response(
+            logs, response_type="full", base_log_dir=request_log_dir
         )
+        names = [
+            await client_name(f.name) if client_name else f.name for f in full.files
+        ]
+        if log_names_digest(names) != names_digest:
+            return full
+
+    # send only the changed files (captures edits)
+    logs = [log for log in logs if (log.mtime is None or log.mtime > mtime)]
+    return log_files_response(
+        logs, response_type="incremental", base_log_dir=request_log_dir
+    )
 
 
-def parse_log_token(log_token: str) -> Tuple[float, int]:
+class LogToken(NamedTuple):
+    """A client's `/log-files` listing token: `<mtime>-<count>[-<names digest>]`."""
+
+    mtime: float
+    file_count: int
+    names_digest: str | None
+
+
+def parse_log_token(log_token: str) -> LogToken:
     # validate basic format
     if log_token.find("-") == -1:
         raise RuntimeError(f"Invalid log token: {log_token}")
@@ -288,8 +317,24 @@ def parse_log_token(log_token: str) -> Tuple[float, int]:
     if log_token.startswith('W/"') and log_token.endswith('"'):
         log_token = log_token[3:-1]
 
-    parts = log_token.split("-", 1)
-    return float(parts[0]), int(parts[1])
+    parts = log_token.split("-", 2)
+    return LogToken(
+        mtime=float(parts[0]),
+        file_count=int(parts[1]),
+        names_digest=parts[2] if len(parts) > 2 else None,
+    )
+
+
+def log_names_digest(names: Iterable[str]) -> str:
+    """Order-independent fingerprint of a listing's file names.
+
+    The sum (mod 2^32) of each name's CRC-32 over UTF-8, as 8 hex digits. The
+    viewer computes the same (`logNamesDigest`), so the two must stay in sync.
+    """
+    total = 0
+    for name in names:
+        total = (total + zlib.crc32(name.encode("utf-8"))) & 0xFFFFFFFF
+    return f"{total:08x}"
 
 
 def log_files_response(
