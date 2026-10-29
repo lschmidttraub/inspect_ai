@@ -11507,16 +11507,29 @@ var base64Pattern = /^(?:[A-Za-z0-9+/]{4})*?(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{
 };
 //#endregion
 //#region ../../packages/util/src/http.ts
+var logFetchRedirect = "error";
+/**
+* Let log fetches follow redirects. Only for a host whose
+* Content-Security-Policy bounds where a redirect can land, like a Hugging
+* Face Space bundle: the Space answers every log read with a redirect to the
+* HF CDN, and the bundle's `connect-src` names only itself and HF hosts.
+*/ var allowLogFetchRedirects = () => {
+	logFetchRedirect = "follow";
+};
 /**
 * Request options for every fetch the browser issues directly to a log
 * location. That location is data (a link param, a listing entry, a
 * server-supplied direct URL), not the page's own origin: it gets no
 * referrer, no cross-origin credentials, and no redirect to a destination
-* other than the one that was named.
+* other than the one that was named (unless the host opted in with
+* `allowLogFetchRedirects`). `redirect` is a getter so a spread copy reads
+* the current setting.
 */ var logFetchInit = Object.freeze({
 	credentials: "same-origin",
 	referrerPolicy: "no-referrer",
-	redirect: "error"
+	get redirect() {
+		return logFetchRedirect;
+	}
 });
 /**
 * Fetches a range of bytes from a remote resource and returns it as a `Uint8Array`.
@@ -50399,6 +50412,7 @@ var staticBackend = (log_dir, abs_log_dir, app_config) => ({
 		const context = scriptEl.textContent;
 		if (context !== null) {
 			const data = import_dist.default.parse(context);
+			if (data.allow_log_redirects === true) allowLogFetchRedirects();
 			if (data.log_dir || data.log_file) {
 				const log_dir = data.log_dir || dirname(data.log_file ?? "");
 				const app_config = data.inspect_version !== void 0 || data.trust_content !== void 0 ? {

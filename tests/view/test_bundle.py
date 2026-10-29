@@ -318,7 +318,12 @@ def _bundle_to(
 ) -> dict[str, Any]:
     """Run `bundle_log_dir` over the fixture dist, capturing the HF push."""
     dist_dir = _fixture_dist(
-        tmp_path, {"default-src": ["'none'"], "connect-src": ["'self'"]}
+        tmp_path,
+        {
+            "default-src": ["'none'"],
+            "font-src": ["'self'"],
+            "connect-src": ["'self'"],
+        },
     )
     monkeypatch.setattr("inspect_ai.log._bundle._dist_dir", lambda: dist_dir.as_posix())
     monkeypatch.setattr(
@@ -348,10 +353,10 @@ def test_hf_bundle_allows_hf_cdn_redirects(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     captured = _bundle_to(tmp_path, monkeypatch, "hf/username/myspace")
-    assert (
-        "connect-src 'self' https://huggingface.co https://*.hf.co"
-        in captured["index_html"]
-    )
+    index_html = captured["index_html"]
+    assert "connect-src 'self' https://huggingface.co https://*.hf.co" in index_html
+    assert "font-src 'self' https://huggingface.co https://*.hf.co" in index_html
+    assert '"allow_log_redirects": true' in index_html
     assert captured["private"] is None
 
 
@@ -363,6 +368,7 @@ def test_local_bundle_keeps_connect_src_self(
     index_html = (output_dir / "index.html").read_text()
     assert "connect-src 'self'\"" in index_html
     assert "hf.co" not in index_html
+    assert "allow_log_redirects" not in index_html
 
 
 def test_hf_bundle_accepts_legacy_private_fs_option(
@@ -453,10 +459,10 @@ def test_push_bundle_to_hf_updates_existing_visibility_when_asked(
     assert api.existing["user/space"] is False
 
 
-def test_csp_extra_connect_src_requires_connect_src(tmp_path: Path) -> None:
+def test_csp_extra_sources_require_the_directive(tmp_path: Path) -> None:
     dist_dir = _fixture_dist(tmp_path, {"default-src": ["'none'"]})
-    with pytest.raises(ContentSecurityPolicyError, match="no 'connect-src'"):
-        read_content_security_policy(dist_dir, ["https://*.hf.co"])
+    with pytest.raises(ContentSecurityPolicyError, match="'connect-src'"):
+        read_content_security_policy(dist_dir, {"connect-src": ["https://*.hf.co"]})
 
 
 def test_bundle_viewer_csp_requires_head(

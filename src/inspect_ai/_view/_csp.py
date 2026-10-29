@@ -9,7 +9,7 @@ dist it was read from.
 """
 
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -26,15 +26,16 @@ class ContentSecurityPolicyError(ValueError):
 
 
 def read_content_security_policy(
-    dist_dir: Path, extra_connect_src: Sequence[str] = ()
+    dist_dir: Path, extra_sources: Mapping[str, Sequence[str]] = {}
 ) -> str | None:
     """Read the viewer Content-Security-Policy from a dist directory.
 
     Args:
         dist_dir: Local directory containing the built viewer (`index.html`).
-        extra_connect_src: Sources appended to the policy's `connect-src`, for
-            hosts that serve the bundled logs from another origin (e.g. a
-            Hugging Face Space redirecting log reads to its CDN).
+        extra_sources: Sources to append, by directive name, for hosts that
+            serve bundled files from another origin (e.g. a Hugging Face Space
+            redirecting log and font reads to its CDN). Each directive must
+            already be in the policy.
 
     Returns:
         The policy string (directives in file order, each name followed by its
@@ -61,14 +62,14 @@ def read_content_security_policy(
         ) from ex
 
     try:
-        return _policy_string(data, extra_connect_src)
+        return _policy_string(data, extra_sources)
     except ValueError as ex:
         raise ContentSecurityPolicyError(
             f"Invalid viewer Content-Security-Policy file {policy_file}: {ex}"
         ) from ex
 
 
-def _policy_string(data: Any, extra_connect_src: Sequence[str] = ()) -> str:
+def _policy_string(data: Any, extra_sources: Mapping[str, Sequence[str]] = {}) -> str:
     if not isinstance(data, dict):
         raise ValueError("expected a JSON object")
 
@@ -94,15 +95,15 @@ def _policy_string(data: Any, extra_connect_src: Sequence[str] = ()) -> str:
         # An empty list is a value-less directive (`upgrade-insecure-requests`).
         if not isinstance(sources, list):
             raise ValueError(f"directive {name!r} must have a list of sources")
-        if folded == "connect-src":
-            sources = [*sources, *extra_connect_src]
+        sources = [*sources, *extra_sources.get(folded, ())]
         for source in sources:
             _validate_token(source, f"source in directive {name!r}")
 
         parts.append(" ".join([name, *sources]))
 
-    if extra_connect_src and "connect-src" not in seen:
-        raise ValueError("policy has no 'connect-src' directive to extend")
+    missing = sorted(set(extra_sources) - seen)
+    if missing:
+        raise ValueError(f"policy has no {missing} directive to extend")
 
     return "; ".join(parts)
 

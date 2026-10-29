@@ -26,10 +26,11 @@ def _dist_dir() -> str:
     return resolve_dist_directory().as_posix()
 
 
-# A Space serves its LFS/Xet files (every bundled log) by redirecting to the
-# Hugging Face CDN (e.g. us.aws.cdn.hf.co), so the viewer's `connect-src
-# 'self'` would block every log read.
-HF_CONNECT_SRC = ("https://huggingface.co", "https://*.hf.co")
+# A Space serves its LFS/Xet files (every bundled log, and the icon fonts) by
+# redirecting to the Hugging Face CDN (e.g. us.aws.cdn.hf.co). The viewer
+# refuses redirected log reads and its CSP allows only 'self', so HF bundles
+# opt in to redirects and allow these hosts for fetches and fonts.
+HF_REDIRECT_HOSTS = ("https://huggingface.co", "https://*.hf.co")
 
 HF_PRIVATE_SPACE_WARNING = (
     "The space is private: its log files are only served to signed-in members, "
@@ -184,7 +185,7 @@ def bundle_log_dir(
                 working_dir,
                 log_dir=log_dir_name,
                 abs_log_dir=absolute_file_path(log_dir),
-                extra_connect_src=HF_CONNECT_SRC if is_hf_target(output_dir) else (),
+                redirect_hosts=HF_REDIRECT_HOSTS if is_hf_target(output_dir) else (),
             )
             p.update(25)
 
@@ -254,6 +255,7 @@ def inject_configuration(
     log_dir: str,
     abs_log_dir: str | None = None,
     content_security_policy: str | None = None,
+    allow_log_redirects: bool = False,
 ) -> None:
     # update the index html to embed the log_dir
     with open(html_file, "r") as file:
@@ -266,9 +268,11 @@ def inject_configuration(
 
     # inject the log dir information into the viewer html
     # so it will load directly
-    context: dict[str, str] = {"log_dir": log_dir}
+    context: dict[str, str | bool] = {"log_dir": log_dir}
     if abs_log_dir is not None:
         context["abs_log_dir"] = abs_log_dir
+    if allow_log_redirects:
+        context["allow_log_redirects"] = True
     import json
 
     context_json = json.dumps(context)
@@ -300,17 +304,32 @@ def _prepare_viewer(
     working_dir: str,
     log_dir: str,
     abs_log_dir: str | None = None,
-    extra_connect_src: Sequence[str] = (),
+    redirect_hosts: Sequence[str] = (),
 ) -> None:
-    """Prepare viewer assets in a working directory."""
+    """Prepare viewer assets in a working directory.
+
+    Args:
+        working_dir: Directory to write the viewer into.
+        log_dir: Log directory, relative to the viewer.
+        abs_log_dir: Absolute source of the logs, shown in the viewer.
+        redirect_hosts: Hosts the bundle's files redirect to. When given, the
+            viewer follows redirected log reads and its CSP allows these hosts
+            for fetches and fonts.
+    """
     copy_dir_contents(_dist_dir(), working_dir)
+    extra_sources = (
+        {"connect-src": redirect_hosts, "font-src": redirect_hosts}
+        if redirect_hosts
+        else {}
+    )
     inject_configuration(
         os.path.join(working_dir, "index.html"),
         log_dir=log_dir,
         abs_log_dir=abs_log_dir,
         content_security_policy=read_content_security_policy(
-            Path(working_dir), extra_connect_src
+            Path(working_dir), extra_sources
         ),
+        allow_log_redirects=bool(redirect_hosts),
     )
     write_robots_txt(working_dir)
 
