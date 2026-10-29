@@ -18572,7 +18572,7 @@ var AutocompleteInput = (t0) => {
 					e_1.stopPropagation();
 					onCommit?.();
 				} else if (e_1.key === "ArrowDown" || e_1.key === "ArrowUp") {
-					const hasOptions = suggestions.some(_temp2$64);
+					const hasOptions = suggestions.some(_temp2$65);
 					if (filteredSuggestions.length > 0 || hasOptions) {
 						e_1.preventDefault();
 						e_1.stopPropagation();
@@ -18768,7 +18768,7 @@ var AutocompleteInput = (t0) => {
 function _temp$114(s) {
 	return s !== null;
 }
-function _temp2$64(s_1) {
+function _temp2$65(s_1) {
 	return s_1 !== null;
 }
 function _temp3$44(prev) {
@@ -31363,7 +31363,7 @@ var usePrismHighlight = (containerRef, contentLength) => {
 					if (!cancelled) highlightCodeBlocks(container, highlightElement);
 				});
 				observer = new MutationObserver((mutations) => {
-					if (mutations.some(_temp2$63)) highlightCodeBlocks(container, highlightElement);
+					if (mutations.some(_temp2$64)) highlightCodeBlocks(container, highlightElement);
 				});
 				observer.observe(container, {
 					childList: true,
@@ -31395,7 +31395,7 @@ function _temp$111(node) {
 	if (node instanceof Element) return node.querySelector("pre code") || node.matches("pre code");
 	return false;
 }
-function _temp2$63(mutation) {
+function _temp2$64(mutation) {
 	if (mutation.type === "childList") return Array.from(mutation.addedNodes).some(_temp$111);
 	return false;
 }
@@ -42509,7 +42509,7 @@ var useBreadcrumbTruncation = (segments, containerRef) => {
 					replaceMeasurementItems(testElement, [
 						firstSegment.text,
 						"...",
-						...segments.slice(segments.length - 1 - endCount, -1).map(_temp2$62),
+						...segments.slice(segments.length - 1 - endCount, -1).map(_temp2$63),
 						lastSegment.text
 					]);
 					if (testElement.scrollWidth <= containerWidth) {
@@ -42550,7 +42550,7 @@ var useBreadcrumbTruncation = (segments, containerRef) => {
 function _temp$109(segment) {
 	return segment.text;
 }
-function _temp2$62(segment_0) {
+function _temp2$63(segment_0) {
 	return segment_0.text;
 }
 //#endregion
@@ -44027,7 +44027,7 @@ var TabPanels = (t0) => {
 	const t2 = `${id}-content`;
 	let t3;
 	if ($[2] !== tabs) {
-		t3 = tabs.map(_temp2$61);
+		t3 = tabs.map(_temp2$62);
 		$[2] = tabs;
 		$[3] = t3;
 	} else t3 = $[3];
@@ -44125,7 +44125,7 @@ function _temp$107(e) {
 		e.currentTarget.click();
 	}
 }
-function _temp2$61(tab, index) {
+function _temp2$62(tab, index) {
 	return /*#__PURE__*/ (0, import_jsx_runtime.jsx)(TabPanel, {
 		...tab.props,
 		index
@@ -51238,7 +51238,7 @@ var TreeNode$1 = /*#__PURE__*/ (0, import_react.memo)((t0) => {
 					className: TreeNode_module_default.empty,
 					children: "empty"
 				}),
-				entries.slice(0, limit).map(_temp2$60),
+				entries.slice(0, limit).map(_temp2$61),
 				entries.length > limit && /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("button", {
 					type: "button",
 					className: TreeNode_module_default.showMore,
@@ -51272,7 +51272,7 @@ TreeNode$1.displayName = "TreeNode";
 function _temp$104(e) {
 	return !e;
 }
-function _temp2$60(entry) {
+function _temp2$61(entry) {
 	return /*#__PURE__*/ (0, import_jsx_runtime.jsx)(TreeNode$1, {
 		name: entry.key,
 		value: entry.value
@@ -59412,7 +59412,7 @@ var logInfoSignature = (info) => `${info.size}:${info.etag ?? ""}`;
 	const result = useAsyncDataFromQuery(t4);
 	let t5;
 	if ($[14] !== enabled || $[15] !== result) {
-		t5 = enabled ? map(result, _temp2$59) : data(void 0);
+		t5 = enabled ? map(result, _temp2$60) : data(void 0);
 		$[14] = enabled;
 		$[15] = result;
 		$[16] = t5;
@@ -59442,7 +59442,7 @@ var logInfoSignature = (info) => `${info.size}:${info.etag ?? ""}`;
 function _temp$102(query) {
 	return query.state.status === "error" ? false : pendingSamplesIntervalMs(query.state.data);
 }
-function _temp2$59(data) {
+function _temp2$60(data) {
 	return data ?? void 0;
 }
 function _temp3$41(data) {
@@ -61097,7 +61097,7 @@ var mergeSampleSummaries = (logSamples, pendingSamples) => {
 		t3 = rows.data?.some((row_0) => row_0.logFile !== logKey) ? loading$2 : map(compose({
 			rows,
 			pending
-		}), _temp2$58);
+		}), _temp2$59);
 		$[8] = logKey;
 		$[9] = pending;
 		$[10] = rows;
@@ -61112,7 +61112,7 @@ var mergeSampleSummaries = (logSamples, pendingSamples) => {
 function _temp$101(row) {
 	return row.summary;
 }
-function _temp2$58(settled) {
+function _temp2$59(settled) {
 	return mergeSampleSummaries(settled.rows.map(_temp$101), settled.pending?.samples ?? []);
 }
 //#endregion
@@ -65171,7 +65171,7 @@ var isNonEmptyObject = (v) => isRecord(v) && Object.keys(v).length > 0;
 	const baseId = id ?? "metadata-grid";
 	const allEntries = entryRecords(entries);
 	const scalars = allEntries.filter(_temp$99);
-	const groups = allEntries.filter(_temp2$57);
+	const groups = allEntries.filter(_temp2$58);
 	const [expanded, setExpanded] = (0, import_react.useState)(false);
 	const isCollapsible = maxRows != null && scalars.length > maxRows;
 	const visibleScalars = isCollapsible && !expanded ? scalars.slice(0, maxRows) : scalars;
@@ -65301,7 +65301,7 @@ var entryRecords = (entries) => {
 function _temp$99(e) {
 	return !isNonEmptyObject(e.value) || isHtmlEscape(e.value);
 }
-function _temp2$57(e_0) {
+function _temp2$58(e_0) {
 	return isNonEmptyObject(e_0.value) && !isHtmlEscape(e_0.value);
 }
 function _temp3$40(prev) {
@@ -67987,7 +67987,7 @@ var ToolSearchView_module_default = {
 	const { namespaces } = t0;
 	let t1;
 	if ($[0] !== namespaces) {
-		t1 = namespaces.map(_temp2$56);
+		t1 = namespaces.map(_temp2$57);
 		$[0] = namespaces;
 		$[1] = t1;
 	} else t1 = $[1];
@@ -68017,7 +68017,7 @@ function _temp$92(tool, toolIdx) {
 		children: /*#__PURE__*/ (0, import_jsx_runtime.jsx)("code", { children: tool.signature })
 	}, `tool-${toolIdx}`);
 }
-function _temp2$56(namespace, nsIdx) {
+function _temp2$57(namespace, nsIdx) {
 	return /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("div", {
 		className: ToolSearchView_module_default.namespace,
 		children: [namespace.name ? /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("div", { children: [/*#__PURE__*/ (0, import_jsx_runtime.jsx)("span", {
@@ -68386,7 +68386,7 @@ var ToolCallView_module_default = { toolCallView: "_toolCallView_x6cus_1" };
 	const { contents } = t0;
 	let t1;
 	if ($[0] !== contents) {
-		t1 = contents.flatMap(_temp2$55).map(_temp3$39);
+		t1 = contents.flatMap(_temp2$56).map(_temp3$39);
 		$[0] = contents;
 		$[1] = t1;
 	} else t1 = $[1];
@@ -68419,7 +68419,7 @@ function _temp$91(c) {
 		return false;
 	} else return true;
 }
-function _temp2$55(c) {
+function _temp2$56(c) {
 	return c.type === "tool" ? c.content : [c];
 }
 function _temp3$39(item, i) {
@@ -69961,7 +69961,7 @@ var kLoadMoreMarginRows = 20;
 	useListKeyboardNavigation(t5);
 	let t6;
 	if ($[8] !== rows) {
-		t6 = () => rows.map(_temp$87).filter(_temp2$54);
+		t6 = () => rows.map(_temp$87).filter(_temp2$55);
 		$[8] = rows;
 		$[9] = t6;
 	} else t6 = $[9];
@@ -70137,7 +70137,7 @@ var kLoadMoreMarginRows = 20;
 function _temp$87(row) {
 	return row.resolved.message.id;
 }
-function _temp2$54(rowId) {
+function _temp2$55(rowId) {
 	return typeof rowId === "string";
 }
 function _temp3$38(item_0) {
@@ -70590,7 +70590,7 @@ var kLoadingFeed = unpagedFeed(loading$2);
 	const pages = data?.pages;
 	let t7;
 	if ($[14] !== pages) {
-		t7 = pages?.flatMap(_temp2$53);
+		t7 = pages?.flatMap(_temp2$54);
 		$[14] = pages;
 		$[15] = t7;
 	} else t7 = $[15];
@@ -70701,7 +70701,7 @@ var kLoadingFeed = unpagedFeed(loading$2);
 function _temp$86(last) {
 	return last.nextCursor?.offset;
 }
-function _temp2$53(page) {
+function _temp2$54(page) {
 	return page.rows;
 }
 function _temp3$37() {}
@@ -75941,7 +75941,7 @@ var kDefaultScorePanelSort = {
 */ var useScorePanelView = () => {
 	const $ = (0, import_compiler_runtime.c)(5);
 	const stored = useStore(_temp$83);
-	const setPropertyValue = useStore(_temp2$52);
+	const setPropertyValue = useStore(_temp2$53);
 	let t0;
 	if ($[0] !== setPropertyValue) {
 		t0 = (view) => {
@@ -76466,7 +76466,7 @@ function _temp$83(state) {
 	const value = state.app.propertyBags[kScorePanelViewBag]?.[kScorePanelViewKey];
 	return isScoreView(value) ? value : void 0;
 }
-function _temp2$52(state_0) {
+function _temp2$53(state_0) {
 	return state_0.appActions.setPropertyValue;
 }
 function _temp3$36(state) {
@@ -77775,7 +77775,7 @@ var ApplicationNavbar = (t0) => {
 	const loadingProp = t1 === void 0 ? false : t1;
 	const [optionsEl, setOptionsEl] = (0, import_react.useState)(null);
 	const themePreference = useUserSettings(_temp$80);
-	const setThemePreference = useUserSettings(_temp2$51);
+	const setThemePreference = useUserSettings(_temp2$52);
 	const isDark = useResolvedIsDark(themePreference);
 	const loading = useSelectedLogLoading() || loadingProp;
 	const isShowing = useStore(_temp3$35);
@@ -77871,7 +77871,7 @@ var ApplicationNavbar = (t0) => {
 function _temp$80(s) {
 	return s.themePreference;
 }
-function _temp2$51(s_0) {
+function _temp2$52(s_0) {
 	return s_0.setThemePreference;
 }
 function _temp3$35(state) {
@@ -78190,7 +78190,7 @@ var ColumnSelectorPopover = (t0) => {
 		} else t10 = $[14];
 		let t11;
 		if ($[15] !== columns) {
-			t11 = columns.filter(_temp2$50);
+			t11 = columns.filter(_temp2$51);
 			$[15] = columns;
 			$[16] = t11;
 		} else t11 = $[16];
@@ -78511,7 +78511,7 @@ var ColumnSelectorPopover = (t0) => {
 function _temp$78(col_0) {
 	return !isScoreField(getFieldKey(col_0));
 }
-function _temp2$50(col_1) {
+function _temp2$51(col_1) {
 	return isScoreField(getFieldKey(col_1));
 }
 function _temp3$34(col_2) {
@@ -87772,7 +87772,7 @@ var LogListGrid = (t0) => {
 		$[29] = t12;
 	} else t12 = $[29];
 	const rowText = t12;
-	const getRowId = _temp2$49;
+	const getRowId = _temp2$50;
 	let t13;
 	if ($[30] !== accessorsKey || $[31] !== filter || $[32] !== findTerm || $[33] !== getComparator || $[34] !== getFilterType || $[35] !== getValue || $[36] !== listing || $[37] !== orderBy || $[38] !== rowText || $[39] !== searchKey || $[40] !== showFind) {
 		t13 = {
@@ -88054,7 +88054,7 @@ var LogListGrid = (t0) => {
 function _temp$75(col_0) {
 	return col_0.id ?? "";
 }
-function _temp2$49(row_2) {
+function _temp2$50(row_2) {
 	return row_2.id;
 }
 function _temp3$33(row_3) {
@@ -88180,7 +88180,7 @@ var kNoRows = [];
 	const $ = (0, import_compiler_runtime.c)(45);
 	const { overlayItems, scopeKey, getValue, getComparator, getFilterType, accessorsKey, listing } = t0;
 	const { gridStateByScope } = useLogsListing();
-	const overlayData = useKeyedMemo(overlayItems, _temp$74, _temp2$48, _temp3$32);
+	const overlayData = useKeyedMemo(overlayItems, _temp$74, _temp2$49, _temp3$32);
 	let t1;
 	if ($[0] !== overlayData) {
 		const folders = [];
@@ -88322,7 +88322,7 @@ var kNoRows = [];
 function _temp$74(item) {
 	return item.id;
 }
-function _temp2$48(item_0) {
+function _temp2$49(item_0) {
 	return [
 		item_0.id,
 		item_0.type,
@@ -88497,7 +88497,7 @@ var LogsPanel = (t0) => {
 	const [showColumnSelector, setShowColumnSelector] = (0, import_react.useState)(false);
 	const [columnButtonEl, setColumnButtonEl] = (0, import_react.useState)(null);
 	const showRetriedLogs = useUserSettings(_temp$73);
-	const setShowRetriedLogs = useUserSettings(_temp2$47);
+	const setShowRetriedLogs = useUserSettings(_temp2$48);
 	const logDir = useLogDir();
 	const { gridStateByScope, patchGridState } = useLogsListing();
 	const { logPath } = useLogRouteParams();
@@ -88969,7 +88969,7 @@ var appendPendingItems = (evalSet, tasksWithLogFiles, items) => {
 function _temp$73(state) {
 	return state.showRetriedLogs;
 }
-function _temp2$47(state_0) {
+function _temp2$48(state_0) {
 	return state_0.setShowRetriedLogs;
 }
 function _temp3$31(state_1) {
@@ -91473,7 +91473,7 @@ var BurstBody = (t0) => {
 			$[20] = t10;
 		} else t10 = $[20];
 		members = row.spans.filter(t10);
-		const firstUuid = members.find(_temp2$46)?.uuid;
+		const firstUuid = members.find(_temp2$47)?.uuid;
 		T0 = Card;
 		let t11;
 		if ($[21] !== burst.label) {
@@ -92368,7 +92368,7 @@ function _temp$72(row) {
 		children: row.value
 	})] }, row.key);
 }
-function _temp2$46(m) {
+function _temp2$47(m) {
 	return m.uuid !== void 0;
 }
 function _temp3$30(p) {
@@ -94229,7 +94229,7 @@ var ModelTokenTable = (t0) => {
 									const cfg = model_configs?.[modelId];
 									const args = model_args?.[modelId];
 									const cfgEntries = cfg ? Object.entries(cfg).filter(_temp$71) : [];
-									const argEntries = args ? Object.entries(args).filter(_temp2$45) : [];
+									const argEntries = args ? Object.entries(args).filter(_temp2$46) : [];
 									if (cfgEntries.length === 0 && argEntries.length === 0) return null;
 									const renderSection = _temp4$24;
 									return /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("div", {
@@ -94347,7 +94347,7 @@ function _temp$71(t0) {
 	const [, v] = t0;
 	return v != null;
 }
-function _temp2$45(t0) {
+function _temp2$46(t0) {
 	const [, v_0] = t0;
 	return v_0 != null;
 }
@@ -94598,7 +94598,7 @@ var ModelUsagePanel = (t0) => {
 			}, c_0.key))
 		});
 		t1 = ModelUsagePanel_module_default.breakdown;
-		t2 = categories.map(_temp2$44);
+		t2 = categories.map(_temp2$45);
 		$[0] = className;
 		$[1] = timing;
 		$[2] = usage;
@@ -94712,7 +94712,7 @@ var ModelUsagePanel = (t0) => {
 function _temp$70(a, c) {
 	return a + c.value;
 }
-function _temp2$44(c_1) {
+function _temp2$45(c_1) {
 	return /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("span", { children: [
 		/*#__PURE__*/ (0, import_jsx_runtime.jsx)("span", { className: clsx(ModelUsagePanel_module_default.swatch, c_1.swatchClass) }),
 		/*#__PURE__*/ (0, import_jsx_runtime.jsx)("b", { children: formatNumber(c_1.value) }),
@@ -95582,7 +95582,7 @@ var ConnectionLogModal = (t0) => {
 			$[3] = retunes;
 			$[4] = t2;
 		} else t2 = $[4];
-		t1 = [...events.map(_temp$68), ...t2.map(_temp2$43)].sort(_temp3$28);
+		t1 = [...events.map(_temp$68), ...t2.map(_temp2$44)].sort(_temp3$28);
 		$[0] = events;
 		$[1] = retunes;
 		$[2] = t1;
@@ -95728,7 +95728,7 @@ function _temp$68(event) {
 		event
 	};
 }
-function _temp2$43(retune) {
+function _temp2$44(retune) {
 	return {
 		kind: "config",
 		time: retune.timestamp,
@@ -96093,7 +96093,7 @@ var kBaselineY = 60;
 					y1: y(seg.value),
 					y2: y(seg.value)
 				}, `cap-${i}`)),
-				data.events.filter(_temp2$42).map((e_1, i_0) => /*#__PURE__*/ (0, import_jsx_runtime.jsx)("line", {
+				data.events.filter(_temp2$43).map((e_1, i_0) => /*#__PURE__*/ (0, import_jsx_runtime.jsx)("line", {
 					className: ConnectionsView_module_default.rateLimitLine,
 					x1: x(e_1.timestamp),
 					x2: x(e_1.timestamp),
@@ -96220,7 +96220,7 @@ function _temp$67(role) {
 		children: role
 	}, role);
 }
-function _temp2$42(e_0) {
+function _temp2$43(e_0) {
 	return e_0.reason === "rate_limit";
 }
 var UsagePanel_module_default = {
@@ -98824,7 +98824,7 @@ var decisionIcon$1 = (decision) => {
 	if ($[4] !== chain || $[5] !== collapsed) {
 		t2 = chain.length > 1 && !collapsed ? /*#__PURE__*/ (0, import_jsx_runtime.jsx)("div", {
 			className: ApprovalEventView_module_default.chain,
-			children: chain.map(_temp2$41)
+			children: chain.map(_temp2$42)
 		}) : null;
 		$[4] = chain;
 		$[5] = collapsed;
@@ -98876,7 +98876,7 @@ var decisionLook = (decision) => {
 function _temp$63(n) {
 	return n.event.decision === "escalate";
 }
-function _temp2$41(node, index) {
+function _temp2$42(node, index) {
 	const step = decisionLook(node.event.decision);
 	const explanation = node.event.explanation?.trim();
 	return /*#__PURE__*/ (0, import_jsx_runtime.jsxs)(import_react.Fragment, { children: [
@@ -101225,7 +101225,7 @@ var ModelEventView = (t0) => {
 	let t8;
 	if ($[15] !== context?.toolEventIds || $[16] !== event.input || $[17] !== event.pending || $[18] !== isCancelled || $[19] !== outputMessages || $[20] !== showAllMessages || $[21] !== userMessages) {
 		t8 = () => {
-			const outputs = event.pending || isCancelled ? outputMessages.filter(_temp2$40) : outputMessages;
+			const outputs = event.pending || isCancelled ? outputMessages.filter(_temp2$41) : outputMessages;
 			const messages = showAllMessages ? [...event.input, ...outputs] : [...userMessages, ...outputs];
 			const toolEventIds = context?.toolEventIds;
 			return toolEventIds ? messages.map((m_0) => withoutToolCallsIn(m_0, toolEventIds)) : messages;
@@ -101914,7 +101914,7 @@ var withoutToolCallsIn = (message, toolEventIds) => {
 function _temp$58(choice) {
 	return choice.message;
 }
-function _temp2$40(m) {
+function _temp2$41(m) {
 	return !isLivePlaceholderMessage(m);
 }
 function _temp3$27(m_1) {
@@ -102158,7 +102158,7 @@ var SampleInitEventView = (t0) => {
 	} else t4 = $[21];
 	let t5;
 	if ($[22] !== event.sample.choices) {
-		t5 = event.sample.choices ? event.sample.choices.map(_temp2$39) : "";
+		t5 = event.sample.choices ? event.sample.choices.map(_temp2$40) : "";
 		$[22] = event.sample.choices;
 		$[23] = t5;
 	} else t5 = $[23];
@@ -102239,7 +102239,7 @@ function _temp$57(file) {
 		children: file
 	}, `sample-init-file-${file}`);
 }
-function _temp2$39(choice, index) {
+function _temp2$40(choice, index) {
 	return /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("div", { children: [
 		String.fromCharCode(65 + index),
 		") ",
@@ -102258,7 +102258,7 @@ var SampleLimitEventView = (t0) => {
 	const $ = (0, import_compiler_runtime.c)(12);
 	const { eventNode, className } = t0;
 	const resolve_title = _temp$56;
-	const resolve_icon = _temp2$38;
+	const resolve_icon = _temp2$39;
 	const baseTitle = resolve_title(eventNode.event.type);
 	let t1;
 	if ($[0] !== baseTitle || $[1] !== eventNode.event.timestamp) {
@@ -102314,7 +102314,7 @@ function _temp$56(type) {
 		case "cost": return "Cost Limit Exceeded";
 	}
 }
-function _temp2$38(type_0) {
+function _temp2$39(type_0) {
 	switch (type_0) {
 		case "custom": return "limitCustom";
 		case "time": return "limitTime";
@@ -104650,7 +104650,7 @@ var Rendered = (t0) => {
 	if (Array.isArray(values)) {
 		let t1;
 		if ($[0] !== values) {
-			t1 = values.map(_temp2$37);
+			t1 = values.map(_temp2$38);
 			$[0] = values;
 			$[1] = t1;
 		} else t1 = $[1];
@@ -104689,7 +104689,7 @@ var None = () => {
 function _temp$52(child) {
 	return child.id;
 }
-function _temp2$37(val, index) {
+function _temp2$38(val, index) {
 	return /*#__PURE__*/ (0, import_jsx_runtime.jsx)(Rendered, { values: val }, index);
 }
 //#endregion
@@ -111086,7 +111086,7 @@ function useTranscriptTimeline(options) {
 	const state = useTimeline(timeline, timelineOptions, timelineProps);
 	let t8;
 	if ($[19] !== state.rows) {
-		t8 = state.rows.filter(_temp2$36);
+		t8 = state.rows.filter(_temp2$37);
 		$[19] = state.rows;
 		$[20] = t8;
 	} else t8 = $[20];
@@ -111407,7 +111407,7 @@ function _temp4$21(row_3) {
 function _temp3$25(item_0) {
 	return item_0.type === "span" || item_0.event.event === "span_begin";
 }
-function _temp2$36(row) {
+function _temp2$37(row) {
 	return row.depth === 0 || rowHasEvents(row);
 }
 function _temp$50(s_0) {
@@ -112480,7 +112480,7 @@ var TimelineSwimLanes = (t0) => {
 		t5 = (rowKey_0) => {
 			const current = isRowCollapsed(rowKey_0);
 			if (current && !header?.timelineConfig?.showBranches) {
-				if (layouts.find((l_0) => l_0.key === rowKey_0)?.markers.some(_temp2$35)) header?.timelineConfig?.setShowBranches(true);
+				if (layouts.find((l_0) => l_0.key === rowKey_0)?.markers.some(_temp2$36)) header?.timelineConfig?.setShowBranches(true);
 			}
 			setRowCollapsedById(rowKey_0, !current);
 		};
@@ -113614,7 +113614,7 @@ var MarkerGlyph = (t0) => {
 function _temp$47(m) {
 	return m.kind === "branch";
 }
-function _temp2$35(m_0) {
+function _temp2$36(m_0) {
 	return m_0.kind === "branch";
 }
 function _temp3$24(l_1) {
@@ -113820,7 +113820,7 @@ function _temp3$24(l_1) {
 	if ($[20] !== activeIndex) {
 		t9 = {
 			activeIndex,
-			onActiveChange: _temp2$34
+			onActiveChange: _temp2$35
 		};
 		$[20] = activeIndex;
 		$[21] = t9;
@@ -113878,7 +113878,7 @@ function _temp3$24(l_1) {
 	} else t14 = $[41];
 	return t14;
 }
-function _temp2$34() {}
+function _temp2$35() {}
 function _temp$46() {}
 //#endregion
 //#region ../../packages/inspect-components/src/transcript/hooks/useListPositionManager.ts
@@ -117459,11 +117459,11 @@ var TranscriptLayout = (t0) => {
 	return t63;
 };
 function _temp$43() {}
-function _temp2$33(a) {
+function _temp2$34(a) {
 	return a.spanType === "agent";
 }
 function _temp3$23(s) {
-	return getAgents(s).some(_temp2$33);
+	return getAgents(s).some(_temp2$34);
 }
 function _temp4$20(l_0) {
 	return l_0.key;
@@ -119225,7 +119225,7 @@ var kNoScoreColorScales$1 = Object.freeze({});
 	if ($[7] !== allColumns || $[8] !== seedDefaultVisibility || $[9] !== setSampleListView || $[10] !== view) {
 		t2 = () => {
 			if (!allColumns || !seedDefaultVisibility) return;
-			const known = new Set(view.columns.map(_temp2$32));
+			const known = new Set(view.columns.map(_temp2$33));
 			const additions = [];
 			for (const col_0 of allColumns) {
 				const id = getFieldKey(col_0);
@@ -119404,7 +119404,7 @@ function _temp3$22(t0) {
 	const [id_1] = t0;
 	return !id_1.startsWith(SCORE_FIELD_RAW_PREFIX);
 }
-function _temp2$32(c) {
+function _temp2$33(c) {
 	return c.id;
 }
 function _temp$42(state) {
@@ -119791,7 +119791,7 @@ function formatPlainValue(v) {
 			$[10] = t2;
 		} else t2 = $[10];
 		const initial = scores.map(t2);
-		const numbers = initial.map(_temp$41).filter(_temp2$31);
+		const numbers = initial.map(_temp$41).filter(_temp2$32);
 		const min = numbers.length ? Math.min(...numbers) : 0;
 		const range = (numbers.length ? Math.max(...numbers) : 0) - min;
 		t1 = initial.map((s_0) => {
@@ -120145,7 +120145,7 @@ function makeCompare(column) {
 function _temp$41(s) {
 	return typeof s.value === "number" ? s.value : null;
 }
-function _temp2$31(v) {
+function _temp2$32(v) {
 	return v !== null;
 }
 function _temp3$21(s_2) {
@@ -120346,7 +120346,7 @@ var FieldLabel = (t0) => {
 				key: "task",
 				content: taskName
 			});
-			const fallbackModels = [...new Set((fields.model_fallbacks ?? []).map(_temp2$30))];
+			const fallbackModels = [...new Set((fields.model_fallbacks ?? []).map(_temp2$31))];
 			if (modelText || fallbackModels.length > 0) {
 				const t21 = fallbackModels.length > 0 && /*#__PURE__*/ (0, import_jsx_runtime.jsx)("em", { children: ` (fallback → ${fallbackModels.join(", ")})` });
 				let t22;
@@ -120729,7 +120729,7 @@ function _temp$40(item, idx) {
 		children: item.content
 	})] }, item.key);
 }
-function _temp2$30(f) {
+function _temp2$31(f) {
 	return f.fallback_model;
 }
 function _temp3$20(acc, s) {
@@ -125028,7 +125028,7 @@ var SharedTerminals = (t0) => {
 		focusSession ? `${focusSession.name} focused` : void 0,
 		focusCommand ? `$ ${commandLabel(focusCommand.command)}` : void 0,
 		`${agent.sessions.filter((session_7) => sessionPhase(session_7, real) === "open").length} open`
-	].filter(_temp2$29).join(" · ") : void 0;
+	].filter(_temp2$30).join(" · ") : void 0;
 	let t14;
 	if ($[30] !== allocation || $[31] !== states) {
 		t14 = () => {
@@ -125238,7 +125238,7 @@ var isEditable = (target) => target instanceof HTMLElement && (target.isContentE
 function _temp$36(state) {
 	return state.sampleActions.setTerminalsViewOpen;
 }
-function _temp2$29(part) {
+function _temp2$30(part) {
 	return part !== void 0;
 }
 //#endregion
@@ -125768,7 +125768,7 @@ var useTranscriptFilter = (t0) => {
 		$[2] = t1;
 	} else t1 = $[2];
 	const filtered = t1;
-	const setFilteredEventTypes = useStore(_temp2$28);
+	const setFilteredEventTypes = useStore(_temp2$29);
 	let t2;
 	if ($[3] !== filtered || $[4] !== setFilteredEventTypes) {
 		t2 = (type, isFiltered) => {
@@ -125880,7 +125880,7 @@ var useTranscriptFilter = (t0) => {
 function _temp$35(state) {
 	return state.sample.eventFilter.filteredTypes;
 }
-function _temp2$28(state_0) {
+function _temp2$29(state_0) {
 	return state_0.sampleActions.setFilteredEventTypes;
 }
 function _temp3$19(col_0) {
@@ -126075,7 +126075,7 @@ var useInspectSearchPanelState = (t0) => {
 };
 var useInspectSearchModelHistory = () => {
 	const $ = (0, import_compiler_runtime.c)(3);
-	const history = useUserSettings(_temp2$27);
+	const history = useUserSettings(_temp2$28);
 	const record = useUserSettings(_temp3$18);
 	let t0;
 	if ($[0] !== history || $[1] !== record) {
@@ -126111,7 +126111,7 @@ var useInspectSearchNavigation = (t0) => {
 function _temp$34(s_0) {
 	return s_0.searchActions.setSearchPanelState;
 }
-function _temp2$27(s) {
+function _temp2$28(s) {
 	return s.searchModelHistory;
 }
 function _temp3$18(s_0) {
@@ -126714,7 +126714,7 @@ TranscriptPanel.displayName = "TranscriptPanel";
 	} else t2 = $[2];
 	const key = useVisitId(t2);
 	const stored = useStore(_temp$33);
-	const setActive = useStore(_temp2$26);
+	const setActive = useStore(_temp2$27);
 	const setSelection = useStore(_temp3$17);
 	const clear = useStore(_temp4$17);
 	const reset = useStore(_temp5$10);
@@ -126819,7 +126819,7 @@ TranscriptPanel.displayName = "TranscriptPanel";
 function _temp$33(state) {
 	return state.sample.evidenceSelection;
 }
-function _temp2$26(state_0) {
+function _temp2$27(state_0) {
 	return state_0.sampleActions.setEvidenceSelectionActive;
 }
 function _temp3$17(state_1) {
@@ -127989,7 +127989,7 @@ var SampleNavbar_module_default = { sampleInfo: "_sampleInfo_a1yqs_1" };
 	}
 	const sampleMatchesRequest = t1;
 	const showFind = useStore(_temp$31);
-	const setShowFind = useStore(_temp2$25);
+	const setShowFind = useStore(_temp2$26);
 	const hideFind = useStore(_temp3$16);
 	const nativeFind = useStore(_temp4$16);
 	const setSampleTab = useStore(_temp5$9);
@@ -128079,7 +128079,7 @@ var SampleNavbar_module_default = { sampleInfo: "_sampleInfo_a1yqs_1" };
 function _temp$31(state) {
 	return state.app.showFind;
 }
-function _temp2$25(state_0) {
+function _temp2$26(state_0) {
 	return state_0.appActions.setShowFind;
 }
 function _temp3$16(state_1) {
@@ -129209,7 +129209,7 @@ var EditMetadataDialog = (t0) => {
 	}
 	let t4;
 	if ($[6] !== entries) {
-		t4 = new Set(entries.map(_temp2$24));
+		t4 = new Set(entries.map(_temp2$25));
 		$[6] = entries;
 		$[7] = t4;
 	} else t4 = $[7];
@@ -129557,7 +129557,7 @@ function _temp$30(t0) {
 		isString: typeof value === "string"
 	};
 }
-function _temp2$24(e) {
+function _temp2$25(e) {
 	return e.key;
 }
 function _temp3$15(e_0) {
@@ -129874,7 +129874,7 @@ var PlanDetailView = (t0) => {
 	} else t2 = $[16];
 	let t3;
 	if ($[17] !== taskColumns) {
-		t3 = taskColumns.map(_temp2$23);
+		t3 = taskColumns.map(_temp2$24);
 		$[17] = taskColumns;
 		$[18] = t3;
 	} else t3 = $[18];
@@ -129938,7 +129938,7 @@ function _temp$28(t0) {
 		params: scorer.params
 	}, key);
 }
-function _temp2$23(col) {
+function _temp2$24(col) {
 	return /*#__PURE__*/ (0, import_jsx_runtime.jsx)(PlanColumn, {
 		title: col.title,
 		className: col.className,
@@ -130321,7 +130321,7 @@ var useJsonTabConfig = (logDetails) => {
 */ var JsonTab = (t0) => {
 	const $ = (0, import_compiler_runtime.c)(7);
 	const { logFile, json } = t0;
-	const downloadFiles = useStore(_temp2$22);
+	const downloadFiles = useStore(_temp2$23);
 	if (logFile && json.length > kJsonMaxSize && downloadFiles) {
 		let t1;
 		if ($[0] !== logFile) {
@@ -130366,7 +130366,7 @@ var useJsonTabConfig = (logDetails) => {
 function _temp$27(state) {
 	return state.app.tabs.workspace;
 }
-function _temp2$22(state) {
+function _temp2$23(state) {
 	return state.capabilities.downloadFiles;
 }
 //#endregion
@@ -130425,7 +130425,7 @@ var timelineBandId = (band, model) => model ? `${band}:${model}` : band;
 	const $ = (0, import_compiler_runtime.c)(10);
 	const { href, show: showTimeline } = useTimelineNavigation();
 	const bandsKey = useTimelineBandsKey();
-	const setPropertyValue = useStore(_temp2$21);
+	const setPropertyValue = useStore(_temp2$22);
 	let t0;
 	if ($[0] !== bandsKey) {
 		t0 = (state_0) => {
@@ -130468,7 +130468,7 @@ var timelineBandId = (band, model) => model ? `${band}:${model}` : band;
 function _temp$26(state) {
 	return state.appActions.setWorkspaceTab;
 }
-function _temp2$21(state) {
+function _temp2$22(state) {
 	return state.appActions.setPropertyValue;
 }
 //#endregion
@@ -130928,14 +130928,237 @@ var SampleSelectionBar_module_default = {
 	action: "_action_q9p89_36"
 };
 //#endregion
+//#region src/app/samples/list/savedViews.ts
+var captureSavedView = (name, current) => ({
+	name,
+	filter: current.filter,
+	columns: current.view.columns.map(({ id, visible }) => ({
+		id,
+		visible
+	})),
+	sort: current.view.sort.map(({ colId, dir }) => ({
+		colId,
+		dir
+	})),
+	scores: current.selectedScores.map(({ scorer, name }) => ({
+		scorer,
+		name
+	})),
+	multiline: current.view.multiline,
+	compactScores: current.view.compactScores
+});
+var scoreKey = (s) => JSON.stringify([s.scorer, s.name]);
+/**
+* Resolve `saved` against the current log. Columns and sorts the log doesn't
+* have are dropped; columns the view doesn't mention keep their visibility
+* and follow the view's columns in their current order.
+*/ var applySavedView = (saved, current) => {
+	const savedVisibility = new Map(saved.columns.map((c) => [c.id, c.visible]));
+	const currentById = new Map(current.view.columns.map((c) => [c.id, c]));
+	const columns = [...saved.columns.filter((c) => currentById.has(c.id)), ...current.view.columns.filter((c) => !savedVisibility.has(c.id))];
+	const sort = saved.sort.filter((s) => currentById.has(s.colId));
+	const available = new Map(current.availableScores.map((s) => [scoreKey(s), s]));
+	const matchedScores = saved.scores.flatMap((s) => {
+		const match = available.get(scoreKey(s));
+		return match ? [match] : [];
+	});
+	const selectedScores = saved.scores.length === 0 || matchedScores.length > 0 ? matchedScores : void 0;
+	return {
+		filter: saved.filter,
+		viewPatch: {
+			columns,
+			sort,
+			multiline: saved.multiline,
+			compactScores: saved.compactScores,
+			userOverrides: {
+				...current.view.userOverrides,
+				multiline: saved.multiline,
+				compactScores: saved.compactScores
+			}
+		},
+		selectedScores
+	};
+};
+/** Whether the list currently shows `saved`, judged over the columns both
+*  have (a log may have columns the view never saw). */ var isSavedViewActive = (saved, current) => {
+	if (saved.filter.trim() !== current.filter.trim()) return false;
+	if (saved.multiline !== current.view.multiline) return false;
+	if (saved.compactScores !== current.view.compactScores) return false;
+	if (JSON.stringify(saved.sort) !== JSON.stringify(current.view.sort)) return false;
+	const savedScores = new Set(saved.scores.map(scoreKey));
+	const currentScores = new Set(current.selectedScores.map(scoreKey));
+	if (savedScores.size !== currentScores.size || [...savedScores].some((k) => !currentScores.has(k))) return false;
+	const currentVisibility = new Map(current.view.columns.map((c) => [c.id, c.visible]));
+	return saved.columns.every((c) => {
+		const visible = currentVisibility.get(c.id);
+		return visible === void 0 || visible === c.visible;
+	});
+};
+var isScoreLabel = (v) => isRecord(v) && typeof v.name === "string" && typeof v.scorer === "string";
+var isColumn = (v) => isRecord(v) && typeof v.id === "string" && typeof v.visible === "boolean";
+var isSort = (v) => isRecord(v) && typeof v.colId === "string" && (v.dir === "asc" || v.dir === "desc");
+var isSavedSampleView = (v) => isRecord(v) && typeof v.name === "string" && typeof v.filter === "string" && Array.isArray(v.columns) && v.columns.every(isColumn) && Array.isArray(v.sort) && v.sort.every(isSort) && Array.isArray(v.scores) && v.scores.every(isScoreLabel) && typeof v.multiline === "boolean" && typeof v.compactScores === "boolean";
+/** Views from browser storage, which any viewer version may have written:
+*  entries that don't match the current shape are dropped. */ var parseSavedViews = (persisted) => Array.isArray(persisted) ? persisted.filter(isSavedSampleView) : [];
+/** Insert `view`, replacing any view with the same name in place. */ var upsertSavedView = (views, view) => {
+	const index = views.findIndex((v) => v.name === view.name);
+	if (index < 0) return [...views, view];
+	return views.map((v, i) => i === index ? view : v);
+};
+var filterLiteral = (id) => typeof id === "number" ? String(id) : `"${id.replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}"`;
+var idCondition = (ids) => ids.length === 1 ? `id == ${filterLiteral(ids[0])}` : `id in (${ids.map(filterLiteral).join(", ")})`;
+/**
+* A filter expression matching exactly the `selected` samples. Ids alone
+* suffice when the log has one epoch; otherwise each epoch gets its own id
+* list, so selecting one epoch of a sample doesn't show the others.
+*/ var selectionFilter = (selected, logEpochs) => {
+	if (logEpochs.size <= 1) return idCondition([...new Set(selected.map((s) => s.id))]);
+	const byEpoch = /* @__PURE__ */ new Map();
+	for (const { id, epoch } of selected) byEpoch.set(epoch, [...byEpoch.get(epoch) ?? [], id]);
+	return [...byEpoch].sort(([a], [b]) => a - b).map(([epoch, ids]) => `(epoch == ${epoch} and ${idCondition(ids)})`).join(" or ");
+};
+//#endregion
+//#region src/state/savedViews.ts
+var useSavedViews = create()(persist((set) => ({
+	views: [],
+	saveView: (view) => {
+		set((state) => ({ views: upsertSavedView(state.views, view) }));
+	},
+	deleteView: (name) => {
+		set((state) => ({ views: state.views.filter((v) => v.name !== name) }));
+	}
+}), {
+	name: "inspect-saved-sample-views",
+	storage: createJSONStorage(() => localStorage),
+	version: 1,
+	merge: (persisted, current) => ({
+		...current,
+		views: parseSavedViews(isRecord(persisted) ? persisted.views : [])
+	})
+}));
+//#endregion
+//#region src/app/samples/list/useSavedSampleViews.ts
+function useSavedSampleViews() {
+	const $ = (0, import_compiler_runtime.c)(27);
+	const { view, patchView } = useSamplesView();
+	const filter = useStore(_temp$25);
+	const setFilter = useStore(_temp2$21);
+	const setSelectedScores = useStore(_temp3$14);
+	const selectedScores = useSelectedScores();
+	const availableScores = useScores();
+	const views = useSavedViews(_temp4$14);
+	const saveView = useSavedViews(_temp5$7);
+	const deleteView = useSavedViews(_temp6$5);
+	let snapshot;
+	let t0;
+	let t1;
+	if ($[0] !== filter || $[1] !== selectedScores || $[2] !== view || $[3] !== views) {
+		snapshot = {
+			filter,
+			view,
+			selectedScores
+		};
+		t0 = views;
+		t1 = views.find((v) => isSavedViewActive(v, snapshot));
+		$[0] = filter;
+		$[1] = selectedScores;
+		$[2] = view;
+		$[3] = views;
+		$[4] = snapshot;
+		$[5] = t0;
+		$[6] = t1;
+	} else {
+		snapshot = $[4];
+		t0 = $[5];
+		t1 = $[6];
+	}
+	let t2;
+	if ($[7] !== saveView || $[8] !== snapshot) {
+		t2 = (name) => saveView(captureSavedView(name, snapshot));
+		$[7] = saveView;
+		$[8] = snapshot;
+		$[9] = t2;
+	} else t2 = $[9];
+	let t3;
+	if ($[10] !== saveView || $[11] !== setFilter || $[12] !== snapshot) {
+		t3 = (name_0, nextFilter) => {
+			saveView(captureSavedView(name_0, {
+				...snapshot,
+				filter: nextFilter
+			}));
+			setFilter(nextFilter);
+		};
+		$[10] = saveView;
+		$[11] = setFilter;
+		$[12] = snapshot;
+		$[13] = t3;
+	} else t3 = $[13];
+	let t4;
+	if ($[14] !== availableScores || $[15] !== patchView || $[16] !== setFilter || $[17] !== setSelectedScores || $[18] !== view) {
+		t4 = (saved) => {
+			const applied = applySavedView(saved, {
+				view,
+				availableScores
+			});
+			patchView(applied.viewPatch);
+			setFilter(applied.filter);
+			if (applied.selectedScores) setSelectedScores(applied.selectedScores);
+		};
+		$[14] = availableScores;
+		$[15] = patchView;
+		$[16] = setFilter;
+		$[17] = setSelectedScores;
+		$[18] = view;
+		$[19] = t4;
+	} else t4 = $[19];
+	let t5;
+	if ($[20] !== deleteView || $[21] !== t0 || $[22] !== t1 || $[23] !== t2 || $[24] !== t3 || $[25] !== t4) {
+		t5 = {
+			views: t0,
+			activeView: t1,
+			saveCurrent: t2,
+			saveWithFilter: t3,
+			apply: t4,
+			remove: deleteView
+		};
+		$[20] = deleteView;
+		$[21] = t0;
+		$[22] = t1;
+		$[23] = t2;
+		$[24] = t3;
+		$[25] = t4;
+		$[26] = t5;
+	} else t5 = $[26];
+	return t5;
+}
+function _temp6$5(state_4) {
+	return state_4.deleteView;
+}
+function _temp5$7(state_3) {
+	return state_3.saveView;
+}
+function _temp4$14(state_2) {
+	return state_2.views;
+}
+function _temp3$14(state_1) {
+	return state_1.logActions.setSelectedScores;
+}
+function _temp2$21(state_0) {
+	return state_0.logActions.setFilter;
+}
+function _temp$25(state) {
+	return state.log.filter;
+}
+//#endregion
 //#region src/app/samples/list/SampleSelectionBar.tsx
 var errorText = (e) => e instanceof Error ? e.message : String(e);
 var focusOnMount = (el) => {
 	el?.focus();
 };
 /** Shown above the samples grid while samples are checked: export them as
-*  a new .eval log, downloaded or saved into the log directory. */ var SampleSelectionBar = (t0) => {
-	const $ = (0, import_compiler_runtime.c)(48);
+*  a new .eval log (downloaded or saved into the log directory), or save a
+*  view that shows only them. */ var SampleSelectionBar = (t0) => {
+	const $ = (0, import_compiler_runtime.c)(70);
 	const { logFile, samples } = t0;
 	let t1;
 	if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
@@ -130945,34 +131168,51 @@ var focusOnMount = (el) => {
 	const api = t1;
 	const logDir = useLogDir();
 	const routePrefix = useRoutePrefix();
-	const refs = selectedSampleRefs(samples, ownedSampleSelection(useStore(_temp$25), logFile).keys);
-	const [fileName, setFileName] = (0, import_react.useState)(void 0);
+	const refs = selectedSampleRefs(samples, ownedSampleSelection(useStore(_temp$24), logFile).keys);
+	const savedViews = useSavedSampleViews();
+	const [form, setForm] = (0, import_react.useState)(void 0);
 	const [busy, setBusy] = (0, import_react.useState)(false);
 	const [error, setError] = (0, import_react.useState)(void 0);
 	const [saved, setSaved] = (0, import_react.useState)(void 0);
+	const [savedView, setSavedView] = (0, import_react.useState)(void 0);
 	if (refs.length === 0) return null;
 	const defaultName = defaultSubsetFileName(logFile, refs.length);
 	let t2;
-	if ($[1] !== defaultName || $[2] !== logFile || $[3] !== refs || $[4] !== setBusy || $[5] !== setError) {
-		t2 = () => {
+	if ($[1] !== defaultName || $[2] !== refs.length || $[3] !== setError || $[4] !== setForm) {
+		t2 = (kind) => {
+			setError(void 0);
+			setForm({
+				kind,
+				name: kind === "log" ? defaultName : `${refs.length} selected ${refs.length === 1 ? "sample" : "samples"}`
+			});
+		};
+		$[1] = defaultName;
+		$[2] = refs.length;
+		$[3] = setError;
+		$[4] = setForm;
+		$[5] = t2;
+	} else t2 = $[5];
+	const openForm = t2;
+	let t3;
+	if ($[6] !== defaultName || $[7] !== logFile || $[8] !== refs || $[9] !== setBusy || $[10] !== setError) {
+		t3 = () => {
 			if (!api.download_log_subset) return;
 			setBusy(true);
 			setError(void 0);
 			api.download_log_subset(logFile, refs, defaultName).catch((e) => setError(errorText(e))).finally(() => setBusy(false));
 		};
-		$[1] = defaultName;
-		$[2] = logFile;
-		$[3] = refs;
-		$[4] = setBusy;
-		$[5] = setError;
-		$[6] = t2;
-	} else t2 = $[6];
-	const handleDownload = t2;
-	let t3;
-	if ($[7] !== fileName || $[8] !== logFile || $[9] !== refs || $[10] !== setBusy || $[11] !== setError || $[12] !== setFileName || $[13] !== setSaved) {
-		t3 = (e_0) => {
-			e_0.preventDefault();
-			if (!api.save_log_subset || fileName === void 0) return;
+		$[6] = defaultName;
+		$[7] = logFile;
+		$[8] = refs;
+		$[9] = setBusy;
+		$[10] = setError;
+		$[11] = t3;
+	} else t3 = $[11];
+	const handleDownload = t3;
+	let t4;
+	if ($[12] !== logFile || $[13] !== refs || $[14] !== setBusy || $[15] !== setError || $[16] !== setForm || $[17] !== setSaved) {
+		t4 = (fileName) => {
+			if (!api.save_log_subset) return;
 			setBusy(true);
 			setError(void 0);
 			api.save_log_subset(logFile, refs, fileName).then((result) => {
@@ -130980,138 +131220,189 @@ var focusOnMount = (el) => {
 					logFile: result.log_file,
 					metricsRecomputed: result.metrics_recomputed
 				});
-				setFileName(void 0);
+				setForm(void 0);
 				imperativeLogData.invalidateLogListing();
-			}).catch((e_1) => setError(errorText(e_1))).finally(() => setBusy(false));
+			}).catch((e_0) => setError(errorText(e_0))).finally(() => setBusy(false));
 		};
-		$[7] = fileName;
-		$[8] = logFile;
-		$[9] = refs;
-		$[10] = setBusy;
-		$[11] = setError;
-		$[12] = setFileName;
-		$[13] = setSaved;
-		$[14] = t3;
-	} else t3 = $[14];
-	const handleSave = t3;
-	let t4;
-	if ($[15] !== saved?.logFile) {
-		t4 = saved?.logFile.split(/[\\/]/).pop();
-		$[15] = saved?.logFile;
-		$[16] = t4;
-	} else t4 = $[16];
-	const savedName = t4;
+		$[12] = logFile;
+		$[13] = refs;
+		$[14] = setBusy;
+		$[15] = setError;
+		$[16] = setForm;
+		$[17] = setSaved;
+		$[18] = t4;
+	} else t4 = $[18];
+	const saveToLogDir = t4;
 	let t5;
-	if ($[17] === Symbol.for("react.memo_cache_sentinel")) {
-		t5 = clsx(SampleSelectionBar_module_default.bar, "text-size-small");
-		$[17] = t5;
-	} else t5 = $[17];
-	const t6 = refs.length === 1 ? "sample" : "samples";
+	if ($[19] !== refs || $[20] !== samples || $[21] !== savedViews || $[22] !== setForm || $[23] !== setSavedView) {
+		t5 = (name) => {
+			const epochs = new Set(samples.map(_temp2$20));
+			savedViews.saveWithFilter(name, selectionFilter(refs, epochs));
+			setSavedView(name);
+			setForm(void 0);
+		};
+		$[19] = refs;
+		$[20] = samples;
+		$[21] = savedViews;
+		$[22] = setForm;
+		$[23] = setSavedView;
+		$[24] = t5;
+	} else t5 = $[24];
+	const saveAsView = t5;
+	let t6;
+	if ($[25] !== form || $[26] !== saveAsView || $[27] !== saveToLogDir) {
+		t6 = (e_1) => {
+			e_1.preventDefault();
+			if (!form) return;
+			const name_0 = form.name.trim();
+			if (form.kind === "log") saveToLogDir(name_0);
+			else saveAsView(name_0);
+		};
+		$[25] = form;
+		$[26] = saveAsView;
+		$[27] = saveToLogDir;
+		$[28] = t6;
+	} else t6 = $[28];
+	const handleSubmit = t6;
 	let t7;
-	if ($[18] !== refs.length || $[19] !== t6) {
-		t7 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("span", {
+	if ($[29] !== form || $[30] !== savedViews.views) {
+		t7 = form?.kind === "view" && savedViews.views.some((v) => v.name === form.name.trim());
+		$[29] = form;
+		$[30] = savedViews.views;
+		$[31] = t7;
+	} else t7 = $[31];
+	const replacingView = t7;
+	let t8;
+	if ($[32] !== saved?.logFile) {
+		t8 = saved?.logFile.split(/[\\/]/).pop();
+		$[32] = saved?.logFile;
+		$[33] = t8;
+	} else t8 = $[33];
+	const savedName = t8;
+	let t9;
+	if ($[34] === Symbol.for("react.memo_cache_sentinel")) {
+		t9 = clsx(SampleSelectionBar_module_default.bar, "text-size-small");
+		$[34] = t9;
+	} else t9 = $[34];
+	const t10 = refs.length === 1 ? "sample" : "samples";
+	let t11;
+	if ($[35] !== refs.length || $[36] !== t10) {
+		t11 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("span", {
 			className: SampleSelectionBar_module_default.count,
 			children: [
 				refs.length,
 				" ",
-				t6,
+				t10,
 				" selected"
 			]
 		});
-		$[18] = refs.length;
-		$[19] = t6;
-		$[20] = t7;
-	} else t7 = $[20];
-	let t8;
-	if ($[21] !== busy || $[22] !== defaultName || $[23] !== fileName || $[24] !== handleDownload || $[25] !== handleSave || $[26] !== setError || $[27] !== setFileName) {
-		t8 = fileName === void 0 ? /*#__PURE__*/ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [api.download_log_subset && /*#__PURE__*/ (0, import_jsx_runtime.jsx)(ToolButton, {
-			className: SampleSelectionBar_module_default.action,
-			label: "Download .eval",
-			icon: busy ? "loading" : "download",
-			disabled: busy,
-			title: "Download the selected samples as a new .eval log",
-			onClick: handleDownload
-		}), api.save_log_subset && /*#__PURE__*/ (0, import_jsx_runtime.jsx)(ToolButton, {
-			className: SampleSelectionBar_module_default.action,
-			label: "Save to log directory…",
-			icon: "add",
-			disabled: busy,
-			title: "Write the selected samples to a new .eval log next to this one",
-			onClick: () => {
-				setError(void 0);
-				setFileName(defaultName);
-			}
-		})] }) : /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("form", {
+		$[35] = refs.length;
+		$[36] = t10;
+		$[37] = t11;
+	} else t11 = $[37];
+	let t12;
+	if ($[38] !== busy || $[39] !== form || $[40] !== handleDownload || $[41] !== handleSubmit || $[42] !== openForm || $[43] !== replacingView || $[44] !== setForm) {
+		t12 = form === void 0 ? /*#__PURE__*/ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+			api.download_log_subset && /*#__PURE__*/ (0, import_jsx_runtime.jsx)(ToolButton, {
+				className: SampleSelectionBar_module_default.action,
+				label: "Download .eval",
+				icon: busy ? "loading" : "download",
+				disabled: busy,
+				title: "Download the selected samples as a new .eval log",
+				onClick: handleDownload
+			}),
+			api.save_log_subset && /*#__PURE__*/ (0, import_jsx_runtime.jsx)(ToolButton, {
+				className: SampleSelectionBar_module_default.action,
+				label: "Save to log directory…",
+				icon: "add",
+				disabled: busy,
+				title: "Write the selected samples to a new .eval log next to this one",
+				onClick: () => openForm("log")
+			}),
+			/*#__PURE__*/ (0, import_jsx_runtime.jsx)(ToolButton, {
+				className: SampleSelectionBar_module_default.action,
+				label: "Save as view…",
+				icon: "filter",
+				disabled: busy,
+				title: "Save a view that shows only the selected samples (as an id filter, so it also applies to other logs with these sample ids)",
+				onClick: () => openForm("view")
+			})
+		] }) : /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("form", {
 			className: SampleSelectionBar_module_default.saveForm,
-			onSubmit: handleSave,
+			onSubmit: handleSubmit,
 			children: [
 				/*#__PURE__*/ (0, import_jsx_runtime.jsx)("input", {
 					type: "text",
 					className: clsx("form-control", SampleSelectionBar_module_default.fileName),
-					"aria-label": "New log file name",
-					value: fileName,
-					onChange: (e_2) => setFileName(e_2.target.value),
+					"aria-label": form.kind === "log" ? "New log file name" : "View name",
+					value: form.name,
+					onChange: (e_2) => setForm({
+						...form,
+						name: e_2.target.value
+					}),
 					ref: focusOnMount
 				}),
 				/*#__PURE__*/ (0, import_jsx_runtime.jsx)(ToolButton, {
 					className: SampleSelectionBar_module_default.action,
 					type: "submit",
-					label: "Save",
+					label: form.kind === "log" ? "Save" : replacingView ? "Replace view" : "Save view",
 					icon: busy ? "loading" : "confirm",
-					disabled: busy || fileName.trim() === ""
+					disabled: busy || form.name.trim() === ""
 				}),
 				/*#__PURE__*/ (0, import_jsx_runtime.jsx)(ToolButton, {
 					className: SampleSelectionBar_module_default.action,
 					label: "Cancel",
 					disabled: busy,
-					onClick: () => setFileName(void 0)
+					onClick: () => setForm(void 0)
 				})
 			]
 		});
-		$[21] = busy;
-		$[22] = defaultName;
-		$[23] = fileName;
-		$[24] = handleDownload;
-		$[25] = handleSave;
-		$[26] = setError;
-		$[27] = setFileName;
-		$[28] = t8;
-	} else t8 = $[28];
-	let t9;
-	if ($[29] !== setSaved) {
-		t9 = () => {
+		$[38] = busy;
+		$[39] = form;
+		$[40] = handleDownload;
+		$[41] = handleSubmit;
+		$[42] = openForm;
+		$[43] = replacingView;
+		$[44] = setForm;
+		$[45] = t12;
+	} else t12 = $[45];
+	let t13;
+	if ($[46] !== setSaved || $[47] !== setSavedView) {
+		t13 = () => {
 			setSaved(void 0);
+			setSavedView(void 0);
 			clearSampleSelection();
 		};
-		$[29] = setSaved;
-		$[30] = t9;
-	} else t9 = $[30];
-	let t10;
-	if ($[31] !== busy || $[32] !== t9) {
-		t10 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)(ToolButton, {
+		$[46] = setSaved;
+		$[47] = setSavedView;
+		$[48] = t13;
+	} else t13 = $[48];
+	let t14;
+	if ($[49] !== busy || $[50] !== t13) {
+		t14 = /*#__PURE__*/ (0, import_jsx_runtime.jsx)(ToolButton, {
 			className: SampleSelectionBar_module_default.action,
 			label: "Clear selection",
 			icon: "selectionClear",
 			subtle: true,
 			disabled: busy,
-			onClick: t9
+			onClick: t13
 		});
-		$[31] = busy;
-		$[32] = t9;
-		$[33] = t10;
-	} else t10 = $[33];
-	let t11;
-	if ($[34] !== error) {
-		t11 = error && /*#__PURE__*/ (0, import_jsx_runtime.jsx)("span", {
+		$[49] = busy;
+		$[50] = t13;
+		$[51] = t14;
+	} else t14 = $[51];
+	let t15;
+	if ($[52] !== error) {
+		t15 = error && /*#__PURE__*/ (0, import_jsx_runtime.jsx)("span", {
 			className: SampleSelectionBar_module_default.error,
 			children: error
 		});
-		$[34] = error;
-		$[35] = t11;
-	} else t11 = $[35];
-	let t12;
-	if ($[36] !== error || $[37] !== logDir || $[38] !== routePrefix || $[39] !== saved || $[40] !== savedName) {
-		t12 = saved && !error && /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("span", {
+		$[52] = error;
+		$[53] = t15;
+	} else t15 = $[53];
+	let t16;
+	if ($[54] !== error || $[55] !== logDir || $[56] !== routePrefix || $[57] !== saved || $[58] !== savedName) {
+		t16 = saved && !error && /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("span", {
 			className: SampleSelectionBar_module_default.saved,
 			children: [
 				"Saved",
@@ -131123,38 +131414,57 @@ var focusOnMount = (el) => {
 				!saved.metricsRecomputed && " (metrics could not be recomputed here, so it has no aggregate results)"
 			]
 		});
-		$[36] = error;
-		$[37] = logDir;
-		$[38] = routePrefix;
-		$[39] = saved;
-		$[40] = savedName;
-		$[41] = t12;
-	} else t12 = $[41];
-	let t13;
-	if ($[42] !== t10 || $[43] !== t11 || $[44] !== t12 || $[45] !== t7 || $[46] !== t8) {
-		t13 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("div", {
-			className: t5,
+		$[54] = error;
+		$[55] = logDir;
+		$[56] = routePrefix;
+		$[57] = saved;
+		$[58] = savedName;
+		$[59] = t16;
+	} else t16 = $[59];
+	let t17;
+	if ($[60] !== error || $[61] !== savedView) {
+		t17 = savedView && !error && /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("span", {
+			className: SampleSelectionBar_module_default.saved,
+			children: [
+				"Showing only the selection, saved as view “",
+				savedView,
+				"”"
+			]
+		});
+		$[60] = error;
+		$[61] = savedView;
+		$[62] = t17;
+	} else t17 = $[62];
+	let t18;
+	if ($[63] !== t11 || $[64] !== t12 || $[65] !== t14 || $[66] !== t15 || $[67] !== t16 || $[68] !== t17) {
+		t18 = /*#__PURE__*/ (0, import_jsx_runtime.jsxs)("div", {
+			className: t9,
 			role: "region",
 			"aria-label": "Selected samples",
 			children: [
-				t7,
-				t8,
-				t10,
 				t11,
-				t12
+				t12,
+				t14,
+				t15,
+				t16,
+				t17
 			]
 		});
-		$[42] = t10;
-		$[43] = t11;
-		$[44] = t12;
-		$[45] = t7;
-		$[46] = t8;
-		$[47] = t13;
-	} else t13 = $[47];
-	return t13;
+		$[63] = t11;
+		$[64] = t12;
+		$[65] = t14;
+		$[66] = t15;
+		$[67] = t16;
+		$[68] = t17;
+		$[69] = t18;
+	} else t18 = $[69];
+	return t18;
 };
-function _temp$25(state) {
+function _temp$24(state) {
 	return state.log.sampleSelection;
+}
+function _temp2$20(s) {
+	return s.epoch;
 }
 //#endregion
 //#region src/app/samples/list/SampleList.tsx
@@ -131164,7 +131474,7 @@ var SampleList = /*#__PURE__*/ (0, import_react.memo)((props) => {
 	const { items, columns, columnVisibility, sorting, onSortingChange, columnSizing, onColumnSizingChange, earlyStopping, totalItemCount, running, multiline, scrollRef, columnFilters, onColumnFilterChange, hideColumnFilters, selectableSamples } = props;
 	const sampleNavigation = useSampleNavigationActions();
 	const { sampleId: routeSampleId, epoch: routeEpoch } = useLogRouteParams();
-	const highlightedSample = useStore(_temp$24);
+	const highlightedSample = useStore(_temp$23);
 	const evalSpec = useSelectedLogDetails()?.eval;
 	let t0;
 	let t1;
@@ -131203,8 +131513,8 @@ var SampleList = /*#__PURE__*/ (0, import_react.memo)((props) => {
 		$[8] = t3;
 	} else t3 = $[8];
 	const getRowHref = t3;
-	const getRowId = _temp2$20;
-	const handleRowSelect = _temp3$14;
+	const getRowId = _temp2$19;
+	const handleRowSelect = _temp3$13;
 	const logFile = useCurrentLogFile();
 	let t4;
 	if ($[9] !== highlightedSample || $[10] !== logFile) {
@@ -131300,7 +131610,7 @@ var SampleList = /*#__PURE__*/ (0, import_react.memo)((props) => {
 	const warnings = result;
 	let t5;
 	if ($[34] !== warnings) {
-		t5 = warnings.map(_temp4$14);
+		t5 = warnings.map(_temp4$13);
 		$[34] = warnings;
 		$[35] = t5;
 	} else t5 = $[35];
@@ -131384,16 +131694,16 @@ var SampleList = /*#__PURE__*/ (0, import_react.memo)((props) => {
 	return t9;
 });
 SampleList.displayName = "SampleList";
-function _temp$24(state) {
+function _temp$23(state) {
 	return state.log.highlightedSample;
 }
-function _temp2$20(row_1) {
+function _temp2$19(row_1) {
 	return makeSampleRowId(row_1.sampleId, row_1.epoch);
 }
-function _temp3$14(row_2) {
+function _temp3$13(row_2) {
 	return highlightSample(row_2.sampleId, row_2.epoch, row_2.logFile);
 }
-function _temp4$14(warning) {
+function _temp4$13(warning) {
 	return /*#__PURE__*/ (0, import_jsx_runtime.jsx)(MessageBand, {
 		id: `sample-warning-message-${warning.type}-${warning.msg}`,
 		message: warning.msg,
@@ -131412,7 +131722,7 @@ var SelectAllCheckbox = (t0) => {
 	const $ = (0, import_compiler_runtime.c)(20);
 	const { rows } = t0;
 	const logFile = useCurrentLogFile();
-	const selection = useStore(_temp$23);
+	const selection = useStore(_temp$22);
 	let t1;
 	if ($[0] !== logFile || $[1] !== selection) {
 		t1 = new Set(ownedSampleSelection(selection, logFile).keys);
@@ -131549,7 +131859,7 @@ var SelectRowCheckbox = (t0) => {
 		orderedRows: () => table.getRowModel().rows.map((r) => r.original)
 	})
 };
-function _temp$23(state) {
+function _temp$22(state) {
 	return state.log.sampleSelection;
 }
 //#endregion
@@ -149218,200 +149528,6 @@ var SamplesViewOptionsPopover_module_default = {
 	nameInput: "_nameInput_wg5rj_126",
 	saveButton: "_saveButton_wg5rj_133"
 };
-//#endregion
-//#region src/app/samples/list/savedViews.ts
-var captureSavedView = (name, current) => ({
-	name,
-	filter: current.filter,
-	columns: current.view.columns.map(({ id, visible }) => ({
-		id,
-		visible
-	})),
-	sort: current.view.sort.map(({ colId, dir }) => ({
-		colId,
-		dir
-	})),
-	scores: current.selectedScores.map(({ scorer, name }) => ({
-		scorer,
-		name
-	})),
-	multiline: current.view.multiline,
-	compactScores: current.view.compactScores
-});
-var scoreKey = (s) => JSON.stringify([s.scorer, s.name]);
-/**
-* Resolve `saved` against the current log. Columns and sorts the log doesn't
-* have are dropped; columns the view doesn't mention keep their visibility
-* and follow the view's columns in their current order.
-*/ var applySavedView = (saved, current) => {
-	const savedVisibility = new Map(saved.columns.map((c) => [c.id, c.visible]));
-	const currentById = new Map(current.view.columns.map((c) => [c.id, c]));
-	const columns = [...saved.columns.filter((c) => currentById.has(c.id)), ...current.view.columns.filter((c) => !savedVisibility.has(c.id))];
-	const sort = saved.sort.filter((s) => currentById.has(s.colId));
-	const available = new Map(current.availableScores.map((s) => [scoreKey(s), s]));
-	const matchedScores = saved.scores.flatMap((s) => {
-		const match = available.get(scoreKey(s));
-		return match ? [match] : [];
-	});
-	const selectedScores = saved.scores.length === 0 || matchedScores.length > 0 ? matchedScores : void 0;
-	return {
-		filter: saved.filter,
-		viewPatch: {
-			columns,
-			sort,
-			multiline: saved.multiline,
-			compactScores: saved.compactScores,
-			userOverrides: {
-				...current.view.userOverrides,
-				multiline: saved.multiline,
-				compactScores: saved.compactScores
-			}
-		},
-		selectedScores
-	};
-};
-/** Whether the list currently shows `saved`, judged over the columns both
-*  have (a log may have columns the view never saw). */ var isSavedViewActive = (saved, current) => {
-	if (saved.filter.trim() !== current.filter.trim()) return false;
-	if (saved.multiline !== current.view.multiline) return false;
-	if (saved.compactScores !== current.view.compactScores) return false;
-	if (JSON.stringify(saved.sort) !== JSON.stringify(current.view.sort)) return false;
-	const savedScores = new Set(saved.scores.map(scoreKey));
-	const currentScores = new Set(current.selectedScores.map(scoreKey));
-	if (savedScores.size !== currentScores.size || [...savedScores].some((k) => !currentScores.has(k))) return false;
-	const currentVisibility = new Map(current.view.columns.map((c) => [c.id, c.visible]));
-	return saved.columns.every((c) => {
-		const visible = currentVisibility.get(c.id);
-		return visible === void 0 || visible === c.visible;
-	});
-};
-var isScoreLabel = (v) => isRecord(v) && typeof v.name === "string" && typeof v.scorer === "string";
-var isColumn = (v) => isRecord(v) && typeof v.id === "string" && typeof v.visible === "boolean";
-var isSort = (v) => isRecord(v) && typeof v.colId === "string" && (v.dir === "asc" || v.dir === "desc");
-var isSavedSampleView = (v) => isRecord(v) && typeof v.name === "string" && typeof v.filter === "string" && Array.isArray(v.columns) && v.columns.every(isColumn) && Array.isArray(v.sort) && v.sort.every(isSort) && Array.isArray(v.scores) && v.scores.every(isScoreLabel) && typeof v.multiline === "boolean" && typeof v.compactScores === "boolean";
-/** Views from browser storage, which any viewer version may have written:
-*  entries that don't match the current shape are dropped. */ var parseSavedViews = (persisted) => Array.isArray(persisted) ? persisted.filter(isSavedSampleView) : [];
-/** Insert `view`, replacing any view with the same name in place. */ var upsertSavedView = (views, view) => {
-	const index = views.findIndex((v) => v.name === view.name);
-	if (index < 0) return [...views, view];
-	return views.map((v, i) => i === index ? view : v);
-};
-//#endregion
-//#region src/state/savedViews.ts
-var useSavedViews = create()(persist((set) => ({
-	views: [],
-	saveView: (view) => {
-		set((state) => ({ views: upsertSavedView(state.views, view) }));
-	},
-	deleteView: (name) => {
-		set((state) => ({ views: state.views.filter((v) => v.name !== name) }));
-	}
-}), {
-	name: "inspect-saved-sample-views",
-	storage: createJSONStorage(() => localStorage),
-	version: 1,
-	merge: (persisted, current) => ({
-		...current,
-		views: parseSavedViews(isRecord(persisted) ? persisted.views : [])
-	})
-}));
-//#endregion
-//#region src/app/samples/list/useSavedSampleViews.ts
-function useSavedSampleViews() {
-	const $ = (0, import_compiler_runtime.c)(22);
-	const { view, patchView } = useSamplesView();
-	const filter = useStore(_temp$22);
-	const setFilter = useStore(_temp2$19);
-	const setSelectedScores = useStore(_temp3$13);
-	const selectedScores = useSelectedScores();
-	const availableScores = useScores();
-	const views = useSavedViews(_temp4$13);
-	const saveView = useSavedViews(_temp5$7);
-	const deleteView = useSavedViews(_temp6$5);
-	let snapshot;
-	let t0;
-	let t1;
-	if ($[0] !== filter || $[1] !== selectedScores || $[2] !== view || $[3] !== views) {
-		snapshot = {
-			filter,
-			view,
-			selectedScores
-		};
-		t0 = views;
-		t1 = views.find((v) => isSavedViewActive(v, snapshot));
-		$[0] = filter;
-		$[1] = selectedScores;
-		$[2] = view;
-		$[3] = views;
-		$[4] = snapshot;
-		$[5] = t0;
-		$[6] = t1;
-	} else {
-		snapshot = $[4];
-		t0 = $[5];
-		t1 = $[6];
-	}
-	let t2;
-	if ($[7] !== saveView || $[8] !== snapshot) {
-		t2 = (name) => saveView(captureSavedView(name, snapshot));
-		$[7] = saveView;
-		$[8] = snapshot;
-		$[9] = t2;
-	} else t2 = $[9];
-	let t3;
-	if ($[10] !== availableScores || $[11] !== patchView || $[12] !== setFilter || $[13] !== setSelectedScores || $[14] !== view) {
-		t3 = (saved) => {
-			const applied = applySavedView(saved, {
-				view,
-				availableScores
-			});
-			patchView(applied.viewPatch);
-			setFilter(applied.filter);
-			if (applied.selectedScores) setSelectedScores(applied.selectedScores);
-		};
-		$[10] = availableScores;
-		$[11] = patchView;
-		$[12] = setFilter;
-		$[13] = setSelectedScores;
-		$[14] = view;
-		$[15] = t3;
-	} else t3 = $[15];
-	let t4;
-	if ($[16] !== deleteView || $[17] !== t0 || $[18] !== t1 || $[19] !== t2 || $[20] !== t3) {
-		t4 = {
-			views: t0,
-			activeView: t1,
-			saveCurrent: t2,
-			apply: t3,
-			remove: deleteView
-		};
-		$[16] = deleteView;
-		$[17] = t0;
-		$[18] = t1;
-		$[19] = t2;
-		$[20] = t3;
-		$[21] = t4;
-	} else t4 = $[21];
-	return t4;
-}
-function _temp6$5(state_4) {
-	return state_4.deleteView;
-}
-function _temp5$7(state_3) {
-	return state_3.saveView;
-}
-function _temp4$13(state_2) {
-	return state_2.views;
-}
-function _temp3$13(state_1) {
-	return state_1.logActions.setSelectedScores;
-}
-function _temp2$19(state_0) {
-	return state_0.logActions.setFilter;
-}
-function _temp$22(state) {
-	return state.log.filter;
-}
 //#endregion
 //#region src/app/samples/list/SamplesViewOptionsPopover.tsx
 var SamplesViewOptionsPopover = (t0) => {
